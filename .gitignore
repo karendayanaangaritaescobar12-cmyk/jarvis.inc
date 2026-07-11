@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# JARVIS build
+backend/build/
+backend/dist/
+backend/*.spec
+
+# SSL certificates (generados en el servidor)
+backend/cert.pem
+backend/key.pem
+
+# Environment variables (contiene API keys)
+backend/.env
+
+# Memory file
+backend/jarvis_memory.json
+
+# Workspace files
+backend/workspace/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Mobile
+android/
+ios/

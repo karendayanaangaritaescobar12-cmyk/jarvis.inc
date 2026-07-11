@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+websockets
+pydantic
+python-dotenv
+openai
+groq
+psutil
+requests
+httpx
