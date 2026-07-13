@@ -69,28 +69,32 @@ class SystemController:
         return None
 
     def run_powershell(self, script: str, timeout: int = 30) -> str:
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", script],
-                capture_output=True, text=True, timeout=timeout,
-                creationflags=subprocess.CREATE_NO_WINDOW if self.system == "windows" else 0
-            )
-            output = result.stdout.strip()
-            error = result.stderr.strip()
-            if error:
-                return f"Error: {error}" if not output else f"{output}\nError: {error}"
-            return output if output else "Comando ejecutado sin salida."
-        except subprocess.TimeoutExpired:
-            return "Timeout: el comando tardó demasiado."
-        except Exception as e:
-            return f"Error ejecutando comando: {str(e)}"
+        if self.system == "windows":
+            try:
+                result = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", script],
+                    capture_output=True, text=True, timeout=timeout,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                output = result.stdout.strip()
+                error = result.stderr.strip()
+                if error:
+                    return f"Error: {error}" if not output else f"{output}\nError: {error}"
+                return output if output else "Comando ejecutado sin salida."
+            except subprocess.TimeoutExpired:
+                return "Timeout: el comando tardó demasiado."
+            except Exception as e:
+                return f"Error ejecutando comando: {str(e)}"
+        else:
+            return self.run_cmd(script, timeout)
 
     def run_cmd(self, command: str, timeout: int = 30) -> str:
         try:
+            flags = subprocess.CREATE_NO_WINDOW if self.system == "windows" else 0
             result = subprocess.run(
                 command, shell=True, capture_output=True, text=True,
                 timeout=timeout,
-                creationflags=subprocess.CREATE_NO_WINDOW if self.system == "windows" else 0
+                creationflags=flags
             )
             output = result.stdout.strip()
             error = result.stderr.strip()
@@ -695,37 +699,67 @@ class SystemController:
     def open_calculator(self) -> str:
         if self.system == "windows":
             subprocess.Popen("calc.exe")
+        elif self.system == "linux":
+            subprocess.Popen(["gnome-calculator"])
+        elif self.system == "darwin":
+            subprocess.Popen(["open", "-a", "Calculator"])
         return "Calculadora abierta."
 
     def open_explorer(self) -> str:
         if self.system == "windows":
             subprocess.Popen("explorer.exe")
+        elif self.system == "linux":
+            subprocess.Popen(["xdg-open", "."])
+        elif self.system == "darwin":
+            subprocess.Popen(["open", "."])
         return "Explorador de archivos abierto."
 
     def shutdown(self) -> str:
         if self.system == "windows":
             os.system("shutdown /s /t 60")
+        elif self.system == "linux":
+            os.system("sudo shutdown -h +1")
+        elif self.system == "darwin":
+            os.system("sudo shutdown -h +1")
         return "Apagando en 60 segundos. Cancela con 'shutdown /a'."
 
     def restart(self) -> str:
         if self.system == "windows":
             os.system("shutdown /r /t 60")
+        elif self.system == "linux":
+            os.system("sudo shutdown -r +1")
+        elif self.system == "darwin":
+            os.system("sudo shutdown -r +1")
         return "Reiniciando en 60 segundos."
 
     def lock_screen(self) -> str:
         if self.system == "windows":
             subprocess.Popen(["rundll32.exe", "user32.dll,LockWorkStation"])
+        elif self.system == "linux":
+            subprocess.Popen(["xdg-screensaver", "lock"])
+        elif self.system == "darwin":
+            subprocess.Popen(["pmset", "displaysleepnow"])
         return "Pantalla bloqueada."
 
     def change_volume(self, direction: str) -> str:
         if self.system == "windows":
             key = "[char]175" if direction == "up" else "[char]174"
             os.system(f'powershell -c "$obj = New-Object -ComObject WScript.Shell; 1..5 | ForEach-Object {{ $obj.SendKeys({key}) }}"')
+        elif self.system == "linux":
+            step = "+5%" if direction == "up" else "-5%"
+            os.system(f"amixer -D pulse sset Master {step}")
+        elif self.system == "darwin":
+            step = "4" if direction == "up" else "-4"
+            os.system(f"osascript -e 'set volume output volume (output volume of (get volume info) + {step})'")
         return f"Volumen {'subido' if direction == 'up' else 'bajado'}."
 
     def mute_volume(self) -> str:
         if self.system == "windows":
             os.system('powershell -c "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"')
+        elif self.system == "linux":
+            os.system("amixer -D pulse sset Master toggle")
+        elif self.system == "darwin":
+            os.system("osascript -e 'set volume output muted (not (output muted of (get volume info)))'")
         return "Volumen silenciado/activado."
 
     def get_running_processes(self) -> str:
@@ -881,28 +915,95 @@ class SystemController:
             "vlc": "vlc.exe",
             "foobar": "foobar2000.exe",
         }
+        linux_apps = {
+            "chrome": "google-chrome",
+            "firefox": "firefox",
+            "terminal": "gnome-terminal",
+            "nautilus": "nautilus",
+            "files": "nautilus",
+            "calculator": "gnome-calculator",
+            "gimp": "gimp",
+            "vlc": "vlc",
+            "blender": "blender",
+            "discord": "discord",
+            "telegram": "telegram-desktop",
+            "code": "code",
+            "vscode": "code",
+        }
+        mac_apps = {
+            "chrome": "Google Chrome",
+            "firefox": "Firefox",
+            "terminal": "Terminal",
+            "finder": "Finder",
+            "calculator": "Calculator",
+            "gimp": "GIMP",
+            "vlc": "VLC",
+            "blender": "Blender",
+            "discord": "Discord",
+            "telegram": "Telegram",
+            "code": "Visual Studio Code",
+            "vscode": "Visual Studio Code",
+        }
         lower = app_name.lower().strip()
-        if lower in common_apps:
+        if self.system == "windows":
+            if lower in common_apps:
+                try:
+                    subprocess.Popen([common_apps[lower]])
+                    return f"{app_name} abierto."
+                except:
+                    pass
             try:
-                subprocess.Popen([common_apps[lower]])
+                subprocess.Popen([f"{lower}.exe"])
                 return f"{app_name} abierto."
             except:
                 pass
-        try:
-            subprocess.Popen([f"{lower}.exe"])
-            return f"{app_name} abierto."
-        except:
-            pass
-        try:
-            os.startfile(lower)
-            return f"{app_name} abierto."
-        except:
-            pass
+            try:
+                os.startfile(lower)
+                return f"{app_name} abierto."
+            except:
+                pass
+        elif self.system == "linux":
+            if lower in linux_apps:
+                try:
+                    subprocess.Popen([linux_apps[lower]])
+                    return f"{app_name} abierto."
+                except:
+                    pass
+            try:
+                subprocess.Popen([lower])
+                return f"{app_name} abierto."
+            except:
+                pass
+            try:
+                subprocess.Popen(["xdg-open", lower])
+                return f"{app_name} abierto."
+            except:
+                pass
+        elif self.system == "darwin":
+            if lower in mac_apps:
+                try:
+                    subprocess.Popen(["open", "-a", mac_apps[lower]])
+                    return f"{app_name} abierto."
+                except:
+                    pass
+            try:
+                subprocess.Popen(["open", "-a", lower])
+                return f"{app_name} abierto."
+            except:
+                pass
         return f"No encontré '{app_name}'. ¿Lo tienes instalado?"
 
     def close_app(self, app_name: str) -> str:
-        result = self.run_powershell(f"Stop-Process -Name '{app_name.replace('.exe','')}' -Force -ErrorAction SilentlyContinue")
-        return f"{app_name} cerrado." if "Error" not in result else f"No pude cerrar {app_name}."
+        if self.system == "windows":
+            result = self.run_powershell(f"Stop-Process -Name '{app_name.replace('.exe','')}' -Force -ErrorAction SilentlyContinue")
+            return f"{app_name} cerrado." if "Error" not in result else f"No pude cerrar {app_name}."
+        elif self.system == "linux":
+            os.system(f"pkill -f {app_name}")
+            return f"{app_name} cerrado."
+        elif self.system == "darwin":
+            os.system(f"pkill -f {app_name}")
+            return f"{app_name} cerrado."
+        return f"No pude cerrar {app_name}."
 
     def minimize_window(self) -> str:
         if self.system == "windows":
