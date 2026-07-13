@@ -408,6 +408,30 @@ async def jarvis_mood():
 async def jarvis_thought():
     return {"thought": consciousness.get_random_thought()}
 
+@app.get("/jarvis/history")
+async def jarvis_history():
+    return {"history": chat_store.get_all()[-100:]}
+
+@app.get("/jarvis/favorites")
+async def jarvis_favorites():
+    fav_file = os.path.join(os.path.dirname(__file__), "data", "favorites.json")
+    if os.path.exists(fav_file):
+        with open(fav_file, "r", encoding="utf-8") as f:
+            return {"favorites": json.load(f)}
+    return {"favorites": []}
+
+class FavoritesRequest(BaseModel):
+    favorites: list
+
+
+@app.post("/jarvis/favorites")
+async def save_favorites(req: FavoritesRequest):
+    fav_file = os.path.join(os.path.dirname(__file__), "data", "favorites.json")
+    os.makedirs(os.path.dirname(fav_file), exist_ok=True)
+    with open(fav_file, "w", encoding="utf-8") as f:
+        json.dump(req.favorites, f, ensure_ascii=False)
+    return {"status": "ok"}
+
 @app.get("/jarvis/memory")
 async def jarvis_memory():
     return {"profile": learning.get_profile_summary(), "stats": chat_store.get_stats()}
