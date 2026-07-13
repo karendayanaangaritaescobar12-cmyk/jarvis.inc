@@ -31,7 +31,7 @@ class IntentRouter:
                 "entities": {}
             },
             "spotify_pause": {
-                "patterns": [r"(?:pausa|pause|para|detener|stop)(?:\s+m[uú]sica)?"],
+                "patterns": [r"(?:pausa|pause|detener|stop)(?:\s+m[uú]sica)?"],
                 "entities": {}
             },
             "spotify_open": {
@@ -123,7 +123,7 @@ class IntentRouter:
                 "entities": {"text": 1}
             },
             "clipboard_paste": {
-                "patterns": [r"(?:pegar|pegar\s+texto|portapapeles|clipboard|copiar$)"],
+                "patterns": [r"(?:pegar|pegar\s+texto|portapapeles|clipboard)"],
                 "entities": {}
             },
             "file_create": {
@@ -339,6 +339,46 @@ class IntentRouter:
             },
             "processes_detailed": {
                 "patterns": [r"(?:procesos\s+detallados|procesos\s+completos|top\s+procesos)"],
+                "entities": {}
+            },
+            "startup_programs": {
+                "patterns": [r"(?:programas?\s+de\s+inicio|startup|inician\s+con\s+windows)"],
+                "entities": {}
+            },
+            "disk_health": {
+                "patterns": [r"(?:salud?\s+del\s+disco|health|estado\s+del\s+disco)"],
+                "entities": {}
+            },
+            "windows_updates": {
+                "patterns": [r"(?:actualizaciones?|updates|windows\s+update)"],
+                "entities": {}
+            },
+            "open_ports": {
+                "patterns": [r"(?:puertos?\s+abiertos?|open\s+ports|netstat)"],
+                "entities": {}
+            },
+            "system_logs": {
+                "patterns": [r"(?:logs?\s+del?\s+sistema|event\s+log|bitacora)"],
+                "entities": {}
+            },
+            "wifi_profiles": {
+                "patterns": [r"(?:perfiles?\s+wifi|wifi\s+guardados?|redes?\s+guardadas?)"],
+                "entities": {}
+            },
+            "power_plan": {
+                "patterns": [r"(?:plan\s+de\s+energia|power\s+plan|bateria\s+avanzado)"],
+                "entities": {}
+            },
+            "convert": {
+                "patterns": [r"(?:convertir|convierte|cuantos?\s+son)\s+(.+?)\s+(?:a|en|to)\s+(.+)"],
+                "entities": {"expression": 1}
+            },
+            "random_number": {
+                "patterns": [r"(?:numero|n[uú]mero)\s+aleatorio\s*(?:entre\s+)?(\d+)\s*(?:y|a|-)\s*(\d+)"],
+                "entities": {"min": 1, "max": 2}
+            },
+            "dice_roll": {
+                "patterns": [r"(?:lanzar|tirar|roll)\s+(?:el\s+)?dados?|dados?"],
                 "entities": {}
             },
         }

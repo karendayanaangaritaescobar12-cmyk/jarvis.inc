@@ -17,6 +17,24 @@ class Utilities:
         self.reminders: List[Dict] = []
         self.notes: List[Dict] = []
         self.timer_start: Optional[float] = None
+        self._data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+        self._reminders_file = os.path.join(self._data_dir, "reminders.json")
+        self._notes_file = os.path.join(self._data_dir, "notes.json")
+        if os.path.exists(self._reminders_file):
+            try:
+                with open(self._reminders_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for r in data:
+                        r["time"] = datetime.datetime.fromisoformat(r["time"])
+                    self.reminders = data
+            except Exception:
+                pass
+        if os.path.exists(self._notes_file):
+            try:
+                with open(self._notes_file, "r", encoding="utf-8") as f:
+                    self.notes = json.load(f)
+            except Exception:
+                pass
         self.jokes = [
             # Ciencia
             "¿Por qué el electrón es tan pesado? Porque tiene masa.",
@@ -196,6 +214,21 @@ class Utilities:
             "No se puede cruzar un abismo en dos pequeños saltos. - David Lloyd George",
         ]
 
+    def _save_reminders(self):
+        os.makedirs(self._data_dir, exist_ok=True)
+        data = []
+        for r in self.reminders:
+            entry = dict(r)
+            entry["time"] = entry["time"].isoformat()
+            data.append(entry)
+        with open(self._reminders_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def _save_notes(self):
+        os.makedirs(self._data_dir, exist_ok=True)
+        with open(self._notes_file, "w", encoding="utf-8") as f:
+            json.dump(self.notes, f, ensure_ascii=False, indent=2)
+
     def get_weather(self, city: str = "Madrid") -> str:
         try:
             url = f"https://wttr.in/{city}?format=j1&lang=es"
@@ -262,6 +295,7 @@ class Utilities:
             "id": len(self.reminders) + 1
         }
         self.reminders.append(reminder)
+        self._save_reminders()
         return f"Recordatorio #{reminder['id']} configurado para {minutes} minutos: {text}"
 
     def get_reminders(self) -> str:
@@ -284,6 +318,7 @@ class Utilities:
             "id": len(self.notes) + 1
         }
         self.notes.append(note)
+        self._save_notes()
         return f"Nota #{note['id']} guardada: {text}"
 
     def get_notes(self) -> str:

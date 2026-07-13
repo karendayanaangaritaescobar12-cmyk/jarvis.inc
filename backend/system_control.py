@@ -1083,19 +1083,6 @@ class SystemController:
             return result if result else "No se detectaron pantallas."
         return "Solo disponible en Windows."
 
-    def set_wallpaper(self, path: str) -> str:
-        paths = [
-            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
-            "code",
-        ]
-        for p in paths:
-            try:
-                subprocess.Popen([p])
-                return "VS Code abierto."
-            except:
-                continue
-        return "No encontré VS Code."
-
     def get_system_info_text(self) -> str:
         info = self.get_system_info()
         bat = info.get('battery')

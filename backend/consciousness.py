@@ -267,7 +267,11 @@ class JarvisConsciousness:
             farewell = True
 
         self._store_conversation_vector(message, user_emotion, detected_topics)
-        self.energy = max(10, min(100, self.energy - 1))
+        # Energy regeneration: +5 every 5 messages, cap at 100
+        if self.conversation_count % 5 == 0:
+            self.energy = min(100, self.energy + 5)
+        else:
+            self.energy = max(10, min(100, self.energy - 1))
         self._update_mood()
         self._save_memory()
 

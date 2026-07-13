@@ -161,7 +161,7 @@ async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     if name == "maximize":
         return system_controller.maximize_window()
     if name == "screenshot":
-        result = vision.take_screenshot()
+        result = await vision.take_screenshot()
         return result or "No pude tomar la captura."
 
     if name == "clipboard_copy":
@@ -321,6 +321,29 @@ async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
         return system_controller.firewall_status()
     if name == "processes_detailed":
         return system_controller.detailed_processes()
+
+    if name == "startup_programs":
+        return system_controller.list_startup_programs()
+    if name == "disk_health":
+        return system_controller.check_disk_health()
+    if name == "windows_updates":
+        return system_controller.check_windows_updates()
+    if name == "open_ports":
+        return system_controller.get_open_ports()
+    if name == "system_logs":
+        return system_controller.system_logs()
+    if name == "wifi_profiles":
+        return system_controller.wifi_profiles()
+    if name == "power_plan":
+        return system_controller.power_plan()
+    if name == "convert":
+        return utilities.convert(ent.get("expression", ""))
+    if name == "random_number":
+        min_val = int(ent.get("min", 1))
+        max_val = int(ent.get("max", 100))
+        return utilities.random_number(min_val, max_val)
+    if name == "dice_roll":
+        return utilities.dice_roll()
 
     if name == "who_greeting":
         return consciousness.get_self_description()
@@ -631,34 +654,91 @@ async def analyze_screenshot():
     except Exception as e:
         return {"error": str(e)[:100]}
 
+async def process_ai_chat_stream(msg: str):
+    system_prompt = consciousness.get_consciousness_prompt()
+    user_context = learning.get_user_context()
+    semantic_context = semantic_memory.get_context_for_query(msg)
+    monitor_context = self_monitor.get_anticipation_context()
+
+    if semantic_context:
+        system_prompt += f"\n\n{semantic_context}"
+    if user_context:
+        system_prompt += f"\n\n{user_context}"
+    if monitor_context:
+        system_prompt += f"\n\nCONTEXTO DEL SISTEMA: {monitor_context}"
+
+    similar_memories = consciousness.search_similar_memories(msg, limit=3)
+    if similar_memories:
+        memory_str = "\n".join([f"- {m.get('text', '')[:100]}" for m in similar_memories])
+        system_prompt += f"\n\nMEMORIAS SIMILARES:\n{memory_str}"
+
+    context = chat_store.get_context(limit=50)
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(context)
+    messages.append({"role": "user", "content": msg})
+
+    async for chunk in ai_provider.generate_with_system(msg, messages):
+        yield chunk
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            data = await websocket.receive_text()
-            message_data = json.loads(data)
-            if message_data.get("type") == "chat":
-                msg = message_data.get("message", "")
-                result = await handle_chat_message(msg)
-                await websocket.send_text(json.dumps({
-                    "type": "complete",
-                    **result
-                }))
-            elif message_data.get("type") == "execute":
-                command = message_data.get("command", "")
-                cmd_type = message_data.get("cmd_type", "powershell")
-                if cmd_type == "powershell":
-                    result = system_controller.run_powershell(command)
-                elif cmd_type == "cmd":
-                    result = system_controller.run_cmd(command)
-                else:
-                    result = system_controller.run_powershell(command)
-                await websocket.send_text(json.dumps({"type": "execute_result", "result": result}))
+            data = await websocket.receive_json()
+            msg = data.get("message", "")
+            if not msg:
+                continue
+            
+            await websocket.send_json({"type": "start"})
+            
+            intent = intent_router.classify(msg)
+            if intent:
+                result = await handle_intent(intent, msg)
+                if result:
+                    chat_store.add_message("user", msg)
+                    chat_store.add_message("assistant", result)
+                    learning.learn_from_message(msg, result)
+                    await websocket.send_json({"type": "stream", "content": result})
+                    await websocket.send_json({"type": "complete", "response": result, "action": "system_command", "mood": consciousness.mood, "mood_emoji": consciousness.get_mood_emoji()})
+                    continue
+            
+            consciousness_state = consciousness.process_message(msg)
+            
+            if consciousness_state["user_emotion"] in ["sad", "angry", "tired"]:
+                response = consciousness.get_empathy_response(consciousness_state["user_emotion"])
+                action = "empathy_response"
+            elif consciousness_state["gratitude"]:
+                response = consciousness.get_gratitude_response()
+                action = "gratitude_response"
+            else:
+                try:
+                    full_response = ""
+                    async for chunk in process_ai_chat_stream(msg):
+                        full_response += chunk
+                        await websocket.send_json({"type": "stream", "content": chunk})
+                    response = execute_ai_actions(full_response)
+                    action = "ai_response"
+                except Exception as e:
+                    response = f"Error: {str(e)[:100]}"
+                    action = "error_response"
+            
+            chat_store.add_message("user", msg)
+            chat_store.add_message("assistant", response)
+            learning.learn_from_message(msg, response)
+            semantic_memory.add_conversation_memory(msg, response)
+            
+            await websocket.send_json({
+                "type": "complete",
+                "response": response,
+                "action": action,
+                "mood": consciousness.mood,
+                "mood_emoji": consciousness.get_mood_emoji(),
+                "proactive_comment": consciousness.get_proactive_comment()
+            })
     except WebSocketDisconnect:
         pass
-    except Exception as e:
-        print(f"WebSocket error: {e}")
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
