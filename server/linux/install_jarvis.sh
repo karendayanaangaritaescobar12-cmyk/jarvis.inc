@@ -22,7 +22,7 @@ echo ""
 # ============================================
 # 1. INSTALAR DEPENDENCIAS
 # ============================================
-echo -e "${YELLOW}[1/7] Installing system dependencies...${NC}"
+echo -e "${YELLOW}[1/6] Installing system dependencies...${NC}"
 
 apt update
 apt install -y \
@@ -39,49 +39,25 @@ apt install -y \
 echo -e "${GREEN}[OK] System dependencies installed${NC}"
 
 # ============================================
-# 2. INSTALAR DEPENDENCIAS PYTHON
+# 2. CLONAR REPOSITORIO
 # ============================================
-echo -e "${YELLOW}[2/7] Installing Python dependencies...${NC}"
-
-pip3 install \
-    fastapi \
-    uvicorn[standard] \
-    python-dotenv \
-    psutil \
-    httpx \
-    beautifulsoup4 \
-    requests \
-    groq \
-    websockets \
-    pydantic
-
-echo -e "${GREEN}[OK] Python dependencies installed${NC}"
-
-# ============================================
-# 3. CLONAR O ACTUALIZAR REPOSITORIO
-# ============================================
-echo -e "${YELLOW}[3/7] Setting up JARVIS...${NC}"
+echo -e "${YELLOW}[2/6] Cloning JARVIS repository...${NC}"
 
 if [ -d "$JARVIS_HOME/.git" ]; then
     echo "[INFO] JARVIS already installed. Updating..."
     cd "$JARVIS_HOME"
     git pull origin main
 else
-    echo "[INFO] Cloning JARVIS repository..."
-    # Si no tienes repo, copiar desde otro lugar
-    # git clone $REPO_URL $JARVIS_HOME
-    
-    # Si ya tienes los archivos localmente:
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cp -r "$SCRIPT_DIR/../../" "$JARVIS_HOME"
+    git clone $REPO_URL $JARVIS_HOME
+    cd "$JARVIS_HOME"
 fi
 
 echo -e "${GREEN}[OK] JARVIS files ready${NC}"
 
 # ============================================
-# 4. CREAR ENTORNO VIRTUAL
+# 3. CREAR ENTORNO VIRTUAL
 # ============================================
-echo -e "${YELLOW}[4/7] Creating virtual environment...${NC}"
+echo -e "${YELLOW}[3/6] Creating virtual environment...${NC}"
 
 cd "$JARVIS_HOME/backend"
 python3 -m venv venv
@@ -91,9 +67,9 @@ pip install -r requirements.txt 2>/dev/null
 echo -e "${GREEN}[OK] Virtual environment created${NC}"
 
 # ============================================
-# 5. GENERAR CERTIFICADOS SSL
+# 4. GENERAR CERTIFICADOS SSL
 # ============================================
-echo -e "${YELLOW}[5/7] Generating SSL certificates...${NC}"
+echo -e "${YELLOW}[4/6] Generating SSL certificates...${NC}"
 
 if [ ! -f cert.pem ] || [ ! -f key.pem ]; then
     openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes \
@@ -104,9 +80,9 @@ else
 fi
 
 # ============================================
-# 6. CREAR WORKSPACE
+# 5. CREAR WORKSPACE
 # ============================================
-echo -e "${YELLOW}[6/7] Creating workspace...${NC}"
+echo -e "${YELLOW}[5/6] Creating workspace...${NC}"
 
 mkdir -p "$JARVIS_HOME/backend/workspace"
 chmod 755 "$JARVIS_HOME/backend/workspace"
@@ -114,9 +90,9 @@ chmod 755 "$JARVIS_HOME/backend/workspace"
 echo -e "${GREEN}[OK] Workspace created${NC}"
 
 # ============================================
-# 7. INSTALAR SERVICIO SYSTEMD
+# 6. INSTALAR SERVICIO SYSTEMD
 # ============================================
-echo -e "${YELLOW}[7/7] Installing systemd service...${NC}"
+echo -e "${YELLOW}[6/6] Installing systemd service...${NC}"
 
 cat > /etc/systemd/system/jarvis.service << EOF
 [Unit]
@@ -136,10 +112,6 @@ StandardError=journal
 
 Environment=PORT=8000
 Environment=PYTHONUNBUFFERED=1
-
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=$JARVIS_HOME/backend/workspace
 
 [Install]
 WantedBy=multi-user.target
