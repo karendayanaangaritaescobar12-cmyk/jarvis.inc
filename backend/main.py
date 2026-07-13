@@ -168,12 +168,41 @@ async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     if name == "clipboard_paste":
         return system_controller.get_clipboard()
 
+    SPECIAL_PATHS = {
+        "escritorio": os.path.join(os.path.expanduser("~"), "Desktop"),
+        "desktop": os.path.join(os.path.expanduser("~"), "Desktop"),
+        "documentos": os.path.join(os.path.expanduser("~"), "Documents"),
+        "documents": os.path.join(os.path.expanduser("~"), "Documents"),
+        "descargas": os.path.join(os.path.expanduser("~"), "Downloads"),
+        "downloads": os.path.join(os.path.expanduser("~"), "Downloads"),
+        "imágenes": os.path.join(os.path.expanduser("~"), "Pictures"),
+        "pictures": os.path.join(os.path.expanduser("~"), "Pictures"),
+        "música": os.path.join(os.path.expanduser("~"), "Music"),
+        "music": os.path.join(os.path.expanduser("~"), "Music"),
+        "vídeos": os.path.join(os.path.expanduser("~"), "Videos"),
+        "videos": os.path.join(os.path.expanduser("~"), "Videos"),
+    }
+    
+    def resolve_special_path(p: str) -> str:
+        lower = p.lower().strip()
+        for key, val in SPECIAL_PATHS.items():
+            if key in lower:
+                return val
+        return p
+
     if name == "file_create":
         parts = ent.get("filename", "")
         if "|" in parts:
             fname, content = parts.split("|", 1)
-            return system_controller.create_file(fname.strip(), content.strip())
+            fname = resolve_special_path(fname.strip())
+            return system_controller.create_file(fname, content.strip())
         import re as _re
+        parts_lower = parts.lower()
+        if "escritorio" in parts_lower or "desktop" in parts_lower:
+            desktop = SPECIAL_PATHS["escritorio"]
+            fname_match = _re.search(r'(\S+\.\w+)', parts)
+            fname = fname_match.group(1) if fname_match else "nuevo_archivo.txt"
+            return system_controller.create_file(os.path.join(desktop, fname), "")
         m = _re.search(r'(\S+\.\w+)', parts)
         if m:
             fname = m.group(1)
@@ -405,9 +434,16 @@ async def favicon():
 @app.get("/status")
 async def status():
     system_info = system_controller.get_system_info()
+    providers = []
+    if os.getenv("GROQ_API_KEY"):
+        providers.append("groq")
+    if os.getenv("GEMINI_API_KEY"):
+        providers.append("gemini")
+    providers.append("ollama")
     return {
         "status": "online",
-        "provider": os.getenv("AI_PROVIDER", "groq"),
+        "provider": os.getenv("AI_PROVIDER", "hybrid"),
+        "providers": providers,
         "system": system_info,
         "features": {
             "semantic_memory": True,

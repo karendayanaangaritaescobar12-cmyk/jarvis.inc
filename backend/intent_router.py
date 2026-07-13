@@ -129,8 +129,11 @@ class IntentRouter:
             "file_create": {
                 "patterns": [
                     r"(?:crear|crea|nuevo|nueva|generar|escribir|escribe|hazme|hacer)\s+(?:un\s+)?(?:archivo|documento|file|txt|fichero)\s+(.+)",
-                    r"(?:necesito|quiero|dame)\s+(?:un\s+)?(?:archivo|documento)\s+(.+)",
+                    r"(?:necesito|quiero|dame|generame|hazme)\s+(?:un\s+)?(?:archivo|documento)\s+(.+)",
                     r"(?:crear|crea)\s+(.+?\.(?:txt|py|js|html|css|json|xml|csv|md|log))",
+                    r"(?:guardar|guarda|salvar|salva)\s+(.+?)\s+(?:en\s+)?(?:un\s+)?(?:archivo|documento)",
+                    r"(?:crear|crea|generar)\s+(?:un\s+)?(?:archivo|documento)\s+(?:en\s+)?(?:el\s+)?(?:escritorio|desktop)",
+                    r"(?:quiero|necesito)\s+(?:que\s+)?(?:crees|guardes)\s+(?:un\s+)?(?:archivo|documento)",
                 ],
                 "entities": {"filename": 1}
             },
