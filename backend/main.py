@@ -2,10 +2,10 @@ import os
 import json
 import re
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
@@ -67,7 +67,7 @@ def execute_ai_actions(text: str) -> str:
     return text
 
 
-def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
+async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     name = intent.name
     ent = intent.entities
 
@@ -150,7 +150,9 @@ def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     if name == "folder_create":
         return system_controller.create_directory(ent.get("foldername", ""))
     if name == "file_read":
-        return system_controller.read_file(ent.get("filename", ""))
+        raw_path = ent.get("filename", "")
+        raw_path = re.sub(r'^(?:el|la|los|las|del|de)\s+', '', raw_path, flags=re.IGNORECASE).strip()
+        return system_controller.read_file(raw_path)
     if name == "file_edit":
         parts = ent.get("args", "")
         if "|" in parts:
@@ -162,9 +164,26 @@ def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     if name == "file_delete":
         return system_controller.delete_file(ent.get("filename", ""))
     if name == "file_list":
-        return system_controller.list_files(ent.get("path", ".") or ".")
+        raw_path = ent.get("path", ".") or "."
+        raw_path = re.sub(r'^(en|de|del|la|el|las|los)\s+', '', raw_path, flags=re.IGNORECASE).strip()
+        return system_controller.list_files(raw_path or ".")
     if name == "file_search":
-        return system_controller.search_files(ent.get("pattern", ""))
+        return system_controller.search_file_content(ent.get("pattern", ""))
+    if name == "file_move":
+        return system_controller.move_file(ent.get("source", ""), ent.get("dest", ""))
+    if name == "file_copy":
+        return system_controller.copy_file(ent.get("source", ""), ent.get("dest", ""))
+    if name == "file_append":
+        return system_controller.append_file(ent.get("filename", ""), ent.get("content", ""))
+    if name == "file_rename":
+        return system_controller.rename_file(ent.get("old_name", ""), ent.get("new_name", ""))
+    if name == "file_info":
+        return system_controller.file_info(ent.get("path", ".") or ".")
+    if name == "file_tree":
+        return system_controller.tree_view(ent.get("path", ".") or ".")
+
+    if name in ["task_organize", "task_script", "task_backup", "task_project", "task_cleanup"]:
+        return await task_executor.execute_task(ent.get("description", ""), system_controller, ai_provider)
 
     if name == "web_search":
         return web.search_google(ent.get("query", ""))
@@ -277,7 +296,7 @@ async def handle_chat_message(msg: str) -> dict:
 
     intent = intent_router.classify(msg)
     if intent:
-        result = handle_intent(intent, msg)
+        result = await handle_intent(intent, msg)
         if result:
             chat_store.add_message("user", msg)
             chat_store.add_message("assistant", result)
@@ -383,7 +402,7 @@ async def execute(req: ExecuteRequest):
     elif req.type == "delete_file":
         result = system_controller.delete_file(req.command)
     elif req.type == "search":
-        result = system_controller.search_files(req.command)
+        result = system_controller.search_file_content(req.command)
     elif req.type == "install":
         result = system_controller.install_package(req.command)
     else:
@@ -395,6 +414,23 @@ async def execute(req: ExecuteRequest):
 async def chat(msg: ChatMessage):
     result = await handle_chat_message(msg.message)
     return result
+
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...), path: str = ""):
+    try:
+        content = await file.read()
+        if path:
+            save_path = path
+        else:
+            save_path = os.path.join(system_controller.workspace, file.filename)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, "wb") as f:
+            f.write(content)
+        size_kb = len(content) / 1024
+        return {"result": f"Archivo guardado: {save_path} ({size_kb:.1f} KB)", "path": save_path}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/jarvis/greeting")

@@ -53,7 +53,7 @@ class TaskExecutor:
                 ext = os.path.splitext(filename)[1].lower()
                 for cat_name, extensions in categories.items():
                     if ext in extensions:
-                        cat_dir = os.path.join(folder, cat_dir)
+                        cat_dir = os.path.join(folder, cat_name)
                         os.makedirs(cat_dir, exist_ok=True)
                         new_path = os.path.join(cat_dir, filename)
                         if not os.path.exists(new_path):

@@ -154,6 +154,50 @@ class IntentRouter:
                 "patterns": [r"(?:buscar|busca|encontrar)\s+(?:archivo|documento)\s+(.+)"],
                 "entities": {"pattern": 1}
             },
+            "file_move": {
+                "patterns": [r"(?:mover|mueve|movimiento)\s+(?:archivo|documento|file)?\s*(.+?)\s+(?:a|hacia|para)\s+(.+)"],
+                "entities": {"source": 1, "dest": 2}
+            },
+            "file_copy": {
+                "patterns": [r"(?:copiar|copia|duplicar)\s+(?:archivo|documento|file)?\s*(.+?)\s+(?:a|hacia|para)\s+(.+)"],
+                "entities": {"source": 1, "dest": 2}
+            },
+            "file_append": {
+                "patterns": [r"(?:agregar|agrega|añadir|añade|concatenar)\s+(?:a\s+)?(?:archivo|documento|file)?\s*(.+?)\s+(?:el\s+)?(?:texto|contenido|linea)?\s*(.+)"],
+                "entities": {"filename": 1, "content": 2}
+            },
+            "file_rename": {
+                "patterns": [r"(?:renombrar|renombra|cambiar\s+nombre)\s+(?:de\s+)?(.+?)\s+(?:a|hacia|por)\s+(.+)"],
+                "entities": {"old_name": 1, "new_name": 2}
+            },
+            "file_info": {
+                "patterns": [r"(?:info(?:rmación)?|detalles?|propiedades?|stats?|estadísticas?)\s+(?:del?\s+)?(?:archivo|documento|file|carpeta|directorio)?\s*(.*)"],
+                "entities": {"path": 1}
+            },
+            "file_tree": {
+                "patterns": [r"(?:árbol|tree|estructura|mostrar\s+carpetas)\s*(.*)"],
+                "entities": {"path": 1}
+            },
+            "task_organize": {
+                "patterns": [r"(?:organizar|organiza|ordenar|ordena)\s+(?:archivos?|carpeta|directorio|descargas?|downloads?)\s*(.*)"],
+                "entities": {"description": 1}
+            },
+            "task_script": {
+                "patterns": [r"(?:crear|generar|escribir)\s+(?:un\s+)?(?:script|c[oó]digo|programa|script\s+de)\s+(.+)"],
+                "entities": {"description": 1}
+            },
+            "task_backup": {
+                "patterns": [r"(?:backup|respaldo|copia\s+de\s+seguridad)\s+(?:de\s+)?(.*)"],
+                "entities": {"description": 1}
+            },
+            "task_project": {
+                "patterns": [r"(?:crear|generar|nuevo)\s+(?:un\s+)?(?:proyecto|estructura)\s+(.+)"],
+                "entities": {"description": 1}
+            },
+            "task_cleanup": {
+                "patterns": [r"(?:limpiar|limpia|cleanup|liberar\s+espacio)\s*(.*)"],
+                "entities": {"description": 1}
+            },
             "web_search": {
                 "patterns": [r"(?:buscar|busca)\s+en\s+(?:web|internet|google)\s+(.+)", r"google\s+(.+)"],
                 "entities": {"query": 1}

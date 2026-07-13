@@ -108,7 +108,10 @@ class SystemController:
 
     def create_file(self, path: str, content: str) -> str:
         try:
-            full_path = os.path.join(self.workspace, path)
+            if os.path.isabs(path):
+                full_path = path
+            else:
+                full_path = os.path.join(self.workspace, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -269,7 +272,10 @@ class SystemController:
 
     def create_directory(self, path: str) -> str:
         try:
-            full_path = os.path.join(self.workspace, path)
+            if os.path.isabs(path):
+                full_path = path
+            else:
+                full_path = os.path.join(self.workspace, path)
             os.makedirs(full_path, exist_ok=True)
             return f"Carpeta creada: {full_path}"
         except Exception as e:

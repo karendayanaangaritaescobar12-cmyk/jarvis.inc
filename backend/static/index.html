@@ -472,6 +472,10 @@ body{font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--t);overf
         <input type="text" id="chatInput" placeholder="Escribe o / para comandos..." autocomplete="off">
         <div class="ideco"></div>
       </div>
+      <input type="file" id="fileInput" multiple style="display:none">
+      <button class="sendbtn" id="uploadBtn" title="Subir archivo" style="background:var(--card);border:1px solid var(--bdr);border-radius:50%;width:36px;height:36px;min-width:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--p)">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+      </button>
       <button class="sendbtn" id="sendBtn" disabled>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
@@ -590,6 +594,22 @@ const SLASH_CMDS = [
   {cmd:'/spotify', desc:'Abrir Spotify'},
   {cmd:'/ip', desc:'Ver mi IP'},
   {cmd:'/clave', desc:'Generar contraseña'},
+  {cmd:'/crear', desc:'Crear archivo'},
+  {cmd:'/leer', desc:'Leer archivo'},
+  {cmd:'/editar', desc:'Editar archivo'},
+  {cmd:'/eliminar', desc:'Eliminar archivo'},
+  {cmd:'/listar', desc:'Listar archivos'},
+  {cmd:'/buscar-archivo', desc:'Buscar archivo'},
+  {cmd:'/mover', desc:'Mover archivo'},
+  {cmd:'/copiar', desc:'Copiar archivo'},
+  {cmd:'/info-archivo', desc:'Info de archivo'},
+  {cmd:'/arbol', desc:'Ver árbol de carpetas'},
+  {cmd:'/subir', desc:'Subir archivo'},
+  {cmd:'/organizar', desc:'Organizar archivos'},
+  {cmd:'/script', desc:'Crear script'},
+  {cmd:'/backup', desc:'Crear respaldo'},
+  {cmd:'/proyecto', desc:'Crear proyecto'},
+  {cmd:'/limpiar', desc:'Limpiar sistema'},
 ];
 
 let acSelected = -1;
@@ -1014,9 +1034,36 @@ document.addEventListener('drop', e=>{
   document.getElementById('dropOverlay').classList.remove('show');
   const files = e.dataTransfer.files;
   if(files.length > 0){
-    const file = files[0];
-    sendMessage(`Archivo: ${file.name} (${(file.size/1024).toFixed(1)} KB)`);
+    for(let i=0; i<files.length; i++){
+      uploadFile(files[i]);
+    }
   }
+});
+
+function uploadFile(file){
+  const formData = new FormData();
+  formData.append('file', file);
+  addMessage('system', `Subiendo: ${file.name} (${(file.size/1024).toFixed(1)} KB)...`);
+  fetch(API + '/upload', { method: 'POST', body: formData })
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.error){ addMessage('system', 'Error: ' + d.error); }
+      else { addMessage('system', d.result); speak(d.result); }
+    })
+    .catch(e=> addMessage('system', 'Error subiendo archivo: ' + e));
+}
+
+document.getElementById('uploadBtn').addEventListener('click', ()=>{
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e=>{
+  const files = e.target.files;
+  if(files.length > 0){
+    for(let i=0; i<files.length; i++){
+      uploadFile(files[i]);
+    }
+  }
+  e.target.value = '';
 });
 
 // Mic
