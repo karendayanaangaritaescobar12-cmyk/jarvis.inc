@@ -26,6 +26,9 @@ from vision import vision
 from task_executor import task_executor
 from natural_voice import natural_voice
 from self_monitor import self_monitor
+from proactive import proactive_engine
+from file_processor import file_processor
+from code_helper import code_helper
 
 load_dotenv()
 
@@ -345,6 +348,29 @@ async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     if name == "dice_roll":
         return utilities.dice_roll()
 
+    if name == "file_process":
+        return file_processor.read_file_content(ent.get("path", ""))
+    if name == "file_info_detailed":
+        info = file_processor.get_file_info(ent.get("path", "."))
+        return json.dumps(info, indent=2, ensure_ascii=False)
+    if name == "code_write":
+        return code_helper.write_code(ent.get("filename", "code.py"), ent.get("content", ""))
+    if name == "code_edit":
+        return code_helper.edit_code(ent.get("path", ""), ent.get("old", ""), ent.get("new", ""))
+    if name == "code_run":
+        return code_helper.run_code(ent.get("path", ""))
+    if name == "code_explain":
+        return code_helper.explain_code(ent.get("code", ""), ent.get("language", "python"))
+    if name == "code_optimize":
+        return code_helper.optimize_code(ent.get("code", ""), ent.get("language", "python"))
+    if name == "code_build":
+        return code_helper.build_project(ent.get("type", "python"), ent.get("name", "proyecto"))
+    if name == "screenshot_analyze":
+        result = await vision.take_screenshot()
+        if result:
+            return file_processor.read_file_content(result)
+        return "No pude tomar la captura."
+
     if name == "who_greeting":
         return consciousness.get_self_description()
     if name == "farewell":
@@ -558,6 +584,49 @@ async def jarvis_memories(q: str = ""):
         results = consciousness.search_similar_memories(q)
         return {"memories": results}
     return {"memories": consciousness.vectors.get("embeddings", [])[-10:]}
+
+
+@app.get("/jarvis/morning-briefing")
+async def morning_briefing():
+    """Send morning briefing if not sent today."""
+    if proactive_engine.should_send_morning_briefing():
+        weather = ""
+        news = ""
+        try:
+            weather = web.get_weather("auto")
+        except:
+            pass
+        try:
+            news = web.get_news("general")
+        except:
+            pass
+        prompt = proactive_engine.build_morning_briefing_prompt(
+            consciousness.memory, weather, news
+        )
+        messages = [{"role": "system", "content": prompt}]
+        response = ""
+        async for chunk in ai_provider.generate_with_system(prompt, messages):
+            response += chunk
+        proactive_engine.mark_morning_briefing_sent()
+        return {"briefing": response, "sent": True}
+    return {"briefing": None, "sent": False, "reason": "Ya enviado hoy o fuera de horario"}
+
+
+@app.get("/jarvis/proactive-check")
+async def proactive_check():
+    """Check if proactive message should be sent."""
+    if proactive_engine.should_trigger():
+        monitor_ctx = self_monitor.get_anticipation_context()
+        prompt = proactive_engine.build_prompt(consciousness.memory, monitor_ctx)
+        messages = [{"role": "system", "content": prompt}]
+        response = ""
+        async for chunk in ai_provider.generate_with_system(prompt, messages):
+            response += chunk
+        proactive_engine.mark_triggered()
+        if "IGNORAR" in response.upper():
+            return {"message": None, "triggered": False}
+        return {"message": response, "triggered": True}
+    return {"message": None, "triggered": False}
 
 
 @app.get("/jarvis/greeting")

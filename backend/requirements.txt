@@ -12,3 +12,7 @@ beautifulsoup4
 Pillow
 edge-tts
 pyautogui
+PyPDF2
+python-docx
+openpyxl
+wmi

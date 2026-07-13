@@ -18,6 +18,51 @@ class IntentRouter:
 
     def _build_intents(self):
         return {
+            "screenshot_analyze": {
+                "patterns": [r"(?:analizar|analiza|qu[eé]\s+ves|describe)\s+(?:la\s+)?(?:captura|pantalla|screenshot)"],
+                "entities": {}
+            },
+            "code_write": {
+                "patterns": [
+                    r"(?:escribir|escribe|crear|crea)\s+(?:c[oó]digo|codigo|script)\s+(.+)",
+                ],
+                "entities": {"content": 1}
+            },
+            "code_edit": {
+                "patterns": [r"(?:editar|edita|modificar|cambiar)\s+(?:c[oó]digo|codigo)\s+(?:en\s+)?(.+?)\s+(?:que|donde|where)\s+(.+?)\s+(?:por|a|por|to)\s+(.+)"],
+                "entities": {"path": 1, "old": 2, "new": 3}
+            },
+            "code_run": {
+                "patterns": [
+                    r"(?:ejecutar|ejecuta|correr|corre|run)\s+(.+?\.(?:py|js|ts|java|cpp|c|rs|go|rb|php))",
+                    r"python\s+(.+)",
+                    r"node\s+(.+)",
+                ],
+                "entities": {"path": 1}
+            },
+            "code_explain": {
+                "patterns": [r"(?:explicar|explica|qu[eé]\s+hace|describe)\s+(?:este\s+)?c[oó]digo"],
+                "entities": {}
+            },
+            "code_optimize": {
+                "patterns": [r"(?:optimizar|optimiza|mejorar|mejora)\s+(?:este\s+)?c[oó]digo"],
+                "entities": {}
+            },
+            "code_build": {
+                "patterns": [r"(?:crear|crea|generar|genera|nuevo)\s+(?:un\s+)?(?:proyecto|estructura)\s+(.+?)\s+(?:llamado|named?|nombre)\s+(.+)"],
+                "entities": {"type": 1, "name": 2}
+            },
+            "file_process": {
+                "patterns": [
+                    r"(?:procesar|analizar)\s+(?:el\s+)?(?:archivo|documento|file)\s+(.+)",
+                    r"(?:leer|abrir)\s+(?:el\s+)?(?:archivo|documento|file)\s+(.+)",
+                ],
+                "entities": {"path": 1}
+            },
+            "file_info_detailed": {
+                "patterns": [r"(?:info\s+detallada|detalles\s+completos|propiedades\s+detalladas)\s+(?:del?\s+)?(.+)"],
+                "entities": {"path": 1}
+            },
             "spotify_play": {
                 "patterns": [r"(?:reproducir|poner\s+m[uú]sica|play|reproduce|pon\s+la\s+m[uú]sica)\s*(.*)"],
                 "entities": {"query": 1}

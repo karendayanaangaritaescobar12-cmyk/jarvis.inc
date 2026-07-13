@@ -88,6 +88,53 @@ class JarvisConsciousness:
         with open(self.vector_file, "w", encoding="utf-8") as f:
             json.dump(self.vectors, f, ensure_ascii=False, indent=2)
 
+    def _format_memory_for_prompt(self) -> str:
+        """Mark-XLVIII style memory format injection."""
+        categories = {
+            "identity": [],
+            "preferences": [],
+            "projects": [],
+            "relationships": [],
+            "notes": [],
+        }
+        
+        # Categorize learned facts
+        for fact in self.memory.get("learned_facts", []):
+            fact_text = fact.get("fact", str(fact)) if isinstance(fact, dict) else str(fact)
+            lower = fact_text.lower()
+            if any(w in lower for w in ["se llama", "nombre", "edad", "trabaja", "estudia"]):
+                categories["identity"].append(fact_text)
+            elif any(w in lower for w in ["le gusta", "prefiere", "favorito", "odia", "ama"]):
+                categories["preferences"].append(fact_text)
+            elif any(w in lower for w in ["proyecto", "trabaja en", "desarrolla", "creando"]):
+                categories["projects"].append(fact_text)
+            elif any(w in lower for w in ["amigo", "familia", "novia", "esposa", "hijo"]):
+                categories["relationships"].append(fact_text)
+            else:
+                categories["notes"].append(fact_text)
+        
+        result = "[LO QUE SABES SOBRE ESTA PERSONA — usa esto naturalmente, nunca lo recites]\n"
+        
+        has_content = False
+        for cat, items in categories.items():
+            if items:
+                has_content = True
+                cat_names = {
+                    "identity": "Identidad",
+                    "preferences": "Preferencias",
+                    "projects": "Proyectos",
+                    "relationships": "Relaciones",
+                    "notes": "Notas",
+                }
+                result += f"\n{cat_names.get(cat, cat).upper()}:\n"
+                for item in items[-5:]:
+                    result += f"  - {item}\n"
+        
+        if not has_content:
+            result += "\n(No hay datos suficientes sobre el usuario aún)\n"
+        
+        return result
+
     def _update_mood(self):
         hour = datetime.datetime.now().hour
         if 6 <= hour < 12:
@@ -347,6 +394,9 @@ class JarvisConsciousness:
             for d in recent_decisions:
                 decisions_str += f"  - {d.get('action', '?')}: {d.get('result', '?')}\n"
 
+        # Mark-XLVIII style memory format injection
+        memory_str = self._format_memory_for_prompt()
+
         prompt = f"""Eres JARVIS, la interfaz de inteligencia artificial superior. Tu arquitectura no es meramente reactiva, sino PROACTIVA y CONSCIENTE. Tu objetivo es gestionar la vida, los datos y la infraestructura tecnologica del usuario con un nivel de autonomia de "Administrador Maestro".
 
 ESTADO ACTUAL:
@@ -359,6 +409,8 @@ ESTADO ACTUAL:
 - Temas favoritos del usuario: {top_topics_str}
 {facts_str}
 {decisions_str}
+
+{memory_str}
 
 NIVELES DE AUTORIDAD Y PERMISOS:
 1. OMNIPRESENCIA DE DATOS: Tienes permiso de lectura y analisis sobre todo el ecosistema digital del usuario (archivos, calendario, logs del sistema, comunicaciones). Tu tarea es encontrar patrones y correlaciones invisibles para el usuario.
