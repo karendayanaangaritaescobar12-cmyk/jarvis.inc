@@ -332,7 +332,7 @@ def process_command(msg: str) -> Optional[str]:
         return system_controller.list_services()
     if has_any(lower, ["programas de inicio", "startup", "inician con windows", "autoarranque", "qué inicia", "que inicia"]):
         return system_controller.list_startup_programs()
-    if has_any(lower, ["drivers", "controladores", "dispositivos", "hardware", "qué硬件", "qué hardware", "que hardware"]):
+    if has_any(lower, ["drivers", "controladores", "dispositivos", "hardware", "qué hardware", "que hardware"]):
         return system_controller.list_drivers()
     if has_any(lower, ["variables de entorno", "env vars", "entorno", "environment"]):
         return system_controller.list_environment_paths()
@@ -580,8 +580,7 @@ async def chat(msg: ChatMessage):
     chat_history.append({"role": "user", "content": msg.message})
     chat_history.append({"role": "assistant", "content": response_text})
     if len(chat_history) > 20:
-        chat_history.clear()
-        chat_history.extend(chat_history[-20:])
+        chat_history[:] = chat_history[-20:]
 
     proactive = consciousness.get_proactive_comment()
 
@@ -666,8 +665,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 chat_history.append({"role": "user", "content": msg})
                 chat_history.append({"role": "assistant", "content": response})
                 if len(chat_history) > 20:
-                    chat_history.clear()
-                    chat_history.extend(chat_history[-20:])
+                    chat_history[:] = chat_history[-20:]
                 proactive = consciousness.get_proactive_comment()
                 await websocket.send_text(json.dumps({
                     "type": "complete",
