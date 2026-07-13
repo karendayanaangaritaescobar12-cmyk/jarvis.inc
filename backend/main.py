@@ -15,6 +15,15 @@ from system_control import system_controller
 from utilities import utilities
 from consciousness import consciousness
 from web_access import web
+from chat_store import chat_store
+from intent_router import intent_router, Intent
+from semantic_memory import semantic_memory
+from learning import learning
+from summarizer import summarizer
+from spotify_api import spotify_api
+from google_services import google_services
+from vision import vision
+from task_executor import task_executor
 
 load_dotenv()
 
@@ -29,7 +38,6 @@ app.add_middleware(
 )
 
 ai_provider = get_provider()
-chat_history = []
 
 
 class ChatMessage(BaseModel):
@@ -40,11 +48,6 @@ class ChatMessage(BaseModel):
 class ExecuteRequest(BaseModel):
     command: str
     type: str = "powershell"
-
-
-class ChatResponse(BaseModel):
-    response: str
-    action: Optional[str] = None
 
 
 def execute_ai_actions(text: str) -> str:
@@ -63,426 +66,260 @@ def execute_ai_actions(text: str) -> str:
     return text
 
 
-def process_command(msg: str) -> Optional[str]:
-    lower = msg.lower().strip()
+def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
+    name = intent.name
+    ent = intent.entities
 
-    # Helper: check if any of the triggers appear in the message
-    def has_any(text, triggers):
-        return any(t in text for t in triggers)
-
-    # === SPOTIFY / MEDIOS ===
-    if has_any(lower, ["reproducir", "poner música", "poner musica", "play", "reproduce", "pon la música", "pon música"]):
-        if "spotify" in lower:
+    if name == "spotify_play":
+        if "spotify" in original_msg.lower():
             return system_controller.open_spotify()
-        if has_any(lower, ["siguiente", "next", "saltar"]):
-            return system_controller.spotify_next()
-        if has_any(lower, ["anterior", "previous", "atrás", "atras"]):
-            return system_controller.spotify_prev()
-        if has_any(lower, ["pausa", "pause", "para", "detener", "stop"]):
-            return system_controller.spotify_play_pause()
         return system_controller.open_spotify()
-    if has_any(lower, ["spotify siguiente", "siguiente canción", "siguiente cancion", "next track"]):
+    if name == "spotify_next":
         return system_controller.spotify_next()
-    if has_any(lower, ["spotify anterior", "canción anterior", "cancion anterior", "previous track"]):
+    if name == "spotify_prev":
         return system_controller.spotify_prev()
-    if has_any(lower, ["pausa música", "pausa musica", "parar música", "parar musica", "pause music"]):
+    if name == "spotify_pause":
         return system_controller.spotify_play_pause()
-    if has_any(lower, ["subir volumen música", "subir volumen musica", "volume up"]):
-        return system_controller.spotify_volume_up()
-    if has_any(lower, ["bajar volumen música", "bajar volumen musica", "volume down"]):
-        return system_controller.spotify_volume_down()
-    if has_any(lower, ["silenciar música", "silenciar musica", "mute music"]):
-        return system_controller.spotify_mute()
-    if has_any(lower, ["abrir spotify", "abre spotify", "spotify"]):
+    if name == "spotify_open":
         return system_controller.open_spotify()
-    if has_any(lower, ["buscar artista", "busca artista", "search artist"]):
-        artist = msg.split("artista")[-1].strip() if "artista" in lower else msg.replace("buscar artista", "").replace("busca artista", "").strip()
-        return system_controller.spotify_open_artist(artist)
-    if has_any(lower, ["buscar playlist", "busca playlist", "search playlist"]):
-        playlist = msg.split("playlist")[-1].strip() if "playlist" in lower else msg.replace("buscar playlist", "").replace("busca playlist", "").strip()
-        return system_controller.spotify_open_playlist(playlist)
+    if name == "spotify_artist":
+        return system_controller.spotify_open_artist(ent.get("artist", ""))
+    if name == "spotify_playlist":
+        return system_controller.spotify_open_playlist(ent.get("playlist", ""))
 
-    # === ABRIR / CERRAR APPS ===
-    if has_any(lower, ["abrir navegador", "abre el navegador", "abre navegador", "navegador", "internet", "chrome", "firefox", "edge"]):
-        if "firefox" in lower:
+    if name == "volume_up":
+        return system_controller.change_volume("up")
+    if name == "volume_down":
+        return system_controller.change_volume("down")
+    if name == "mute":
+        return system_controller.mute_volume()
+
+    if name == "open_browser":
+        if "firefox" in original_msg.lower():
             return system_controller.open_app("firefox")
-        if "edge" in lower:
+        if "edge" in original_msg.lower():
             return system_controller.open_app("edge")
         return system_controller.open_browser()
-    if has_any(lower, ["abrir calculadora", "abre calculadora", "calculadora"]):
+    if name == "open_calculator":
         return system_controller.open_calculator()
-    if has_any(lower, ["abrir explorador", "abre explorador", "explorador de archivos", "explorador", "archivos", "carpeta"]):
+    if name == "open_explorer":
         return system_controller.open_explorer()
-    if has_any(lower, ["abrir vscode", "abre vscode", "abre visual", "visual studio", "vs code", "vscode", "abre el codigo", "abre código", "abrir código"]):
+    if name == "open_vscode":
         return system_controller.open_vscode()
-    if has_any(lower, ["abrir word", "abre word", "microsoft word", "word"]):
-        return system_controller.open_app("word")
-    if has_any(lower, ["abrir excel", "abre excel", "excel"]):
-        return system_controller.open_app("excel")
-    if has_any(lower, ["abrir powerpoint", "abre powerpoint", "abrir presentación", "powerpoint"]):
-        return system_controller.open_app("powerpoint")
-    if has_any(lower, ["abrir notepad", "abre notepad", "bloc de notas", "notepad"]):
-        return system_controller.open_app("notepad")
-    if has_any(lower, ["abrir discord", "abre discord", "discord"]):
-        return system_controller.open_app("discord")
-    if has_any(lower, ["abrir telegram", "abre telegram", "telegram"]):
-        return system_controller.open_app("telegram")
-    if has_any(lower, ["abrir obs", "abre obs", "abrir obs studio", "obs studio", "obs"]):
-        return system_controller.open_app("obs")
-    if has_any(lower, ["abrir terminal", "abre terminal", "abrir powershell", "abre powershell", "abrir cmd", "abre cmd", "abrir consola", "abre consola", "terminal", "powershell", "cmd"]):
-        return system_controller.open_app("terminal")
-    if has_any(lower, ["abrir paint", "abre paint", "paint"]):
-        return system_controller.open_app("paint")
-    if has_any(lower, ["abrir vlc", "abre vlc", "abrir reproductor", "vlc"]):
-        return system_controller.open_app("vlc")
-    if has_any(lower, ["abrir steam", "abre steam", "steam"]):
-        return system_controller.open_app("steam")
-    if has_any(lower, ["abrir blender", "abre blender", "blender"]):
-        return system_controller.open_app("blender")
-    if has_any(lower, ["abrir photoshop", "abre photoshop", "photoshop"]):
-        return system_controller.open_app("photoshop")
-    if has_any(lower, ["abrir premiere", "abre premiere", "premiere"]):
-        return system_controller.open_app("premiere")
-    if has_any(lower, ["abrir app", "abre app", "abrir aplicación", "abre aplicación", "iniciar app", "iniciar aplicación"]):
-        app_name = msg.replace("abrir app", "").replace("abre app", "").replace("abrir aplicación", "").replace("abre aplicación", "").replace("iniciar app", "").replace("iniciar aplicación", "").strip()
-        return system_controller.open_app(app_name)
-    if has_any(lower, ["cerrar app", "cierra app", "cerrar aplicación", "cierra aplicación", "cerrar programa", "cierra programa"]):
-        app_name = msg.replace("cerrar app", "").replace("cierra app", "").replace("cerrar aplicación", "").replace("cierra aplicación", "").replace("cerrar programa", "").replace("cierra programa", "").strip()
-        return system_controller.close_app(app_name)
+    if name == "open_app":
+        return system_controller.open_app(ent.get("app_name", ""))
+    if name == "open_any_app":
+        return system_controller.open_app(ent.get("app_name", ""))
+    if name == "close_app":
+        return system_controller.close_app(ent.get("app_name", ""))
 
-    # === SISTEMA ===
-    if has_any(lower, ["apagar", "apaga el pc", "shutdown", "apaga la pc", "apaga computadora", "apagar computadora"]):
+    if name == "shutdown":
         return system_controller.shutdown()
-    if has_any(lower, ["reiniciar", "reinicia el pc", "restart", "reinicia la pc", "reboot"]):
+    if name == "restart":
         return system_controller.restart()
-    if has_any(lower, ["bloquear", "bloquear pc", "lock", "bloquear pantalla"]):
+    if name == "lock":
         return system_controller.lock_screen()
-    if has_any(lower, ["volumen subir", "subir volumen", "mas volumen", "más volumen", "sube el volumen", "más volumen"]):
-        return system_controller.change_volume("up")
-    if has_any(lower, ["volumen bajar", "bajar volumen", "menos volumen", "baja el volumen"]):
-        return system_controller.change_volume("down")
-    if has_any(lower, ["mutear", "silenciar el volumen", "mute", "silenciar volumen"]):
-        return system_controller.mute_volume()
-    if has_any(lower, ["procesos", "qué está corriendo", "que esta corriendo", "qué corre", "que corre", "procesos abiertos"]):
+    if name == "processes":
         return system_controller.get_running_processes()
-    if has_any(lower, ["información del sistema", "informacion del sistema", "system info", "info del sistema", "info del pc", "información del pc", "qué tengo", "que tengo", "specs", "especificaciones"]):
+    if name == "system_info":
         info = system_controller.get_system_info()
         bat = info.get('battery')
         bat_str = f"\nBatería: {bat['percent']}% ({'Cargando' if bat['power_plugged'] else 'Sin carga'})" if bat else ""
         return f"Sistema: {info['system']} {info['version']}\nCPU: {info['cpu_percent']}%\nMemoria: {info['memory']['percent']}%{bat_str}"
-
-    # === VENTANAS ===
-    if has_any(lower, ["minimizar", "minimizar ventana", "minimize", "minimizar todo"]):
+    if name == "minimize":
         return system_controller.minimize_window()
-    if has_any(lower, ["maximizar", "maximizar ventana", "maximize", "pantalla completa", "maximizar ventana"]):
+    if name == "maximize":
         return system_controller.maximize_window()
-    if has_any(lower, ["screenshot", "captura", "tomar captura", "captura de pantalla", "capturar pantalla"]):
-        return system_controller.screenshot()
+    if name == "screenshot":
+        result = vision.take_screenshot()
+        return result or "No pude tomar la captura."
 
-    # === PORTAPAPELES ===
-    if has_any(lower, ["copiar texto", "copiar al portapapeles"]):
-        text = msg.replace("copiar texto", "").replace("copiar al portapapeles", "").strip()
-        if text:
-            return system_controller.set_clipboard(text)
-        return system_controller.get_clipboard()
-    if has_any(lower, ["pegar", "pegar texto", "portapapeles", "clipboard", "copiar"]):
+    if name == "clipboard_copy":
+        return system_controller.set_clipboard(ent.get("text", ""))
+    if name == "clipboard_paste":
         return system_controller.get_clipboard()
 
-    # === ARCHIVOS (acepta "archivo", "documento", "file", "txt") ===
-    file_aliases = ["archivo", "documento", "file", "txt", "fichero"]
-    create_words = ["crear", "crea", "nuevo", "nueva", "generar", "genera", "escribir", "escribe"]
-    folder_words = ["carpeta", "directorio", "folder"]
-
-    # Crear archivo/documento
-    if has_any(lower, create_words) and has_any(lower, file_aliases):
-        parts = lower
-        for w in create_words + file_aliases + ["el ", "la ", "un ", "una ", "lo "]:
-            parts = parts.replace(w, "")
-        parts = parts.strip()
+    if name == "file_create":
+        parts = ent.get("filename", "")
         if "|" in parts:
-            name, content = parts.split("|", 1)
-            return system_controller.create_file(name.strip(), content.strip())
-        return system_controller.create_file(parts, "") if parts else "¿Nombre del archivo?"
-    # Crear carpeta/directorio
-    if has_any(lower, create_words) and has_any(lower, folder_words):
-        parts = lower
-        for w in create_words + folder_words + ["el ", "la ", "un ", "una ", "lo "]:
-            parts = parts.replace(w, "")
-        parts = parts.strip()
-        return system_controller.create_directory(parts) if parts else "¿Nombre de la carpeta?"
-
-    # Leer archivo/documento
-    read_words = ["leer", "lee", "abrir", "abre", "mostrar", "muestra", "ver", "contenido de"]
-    if has_any(lower, read_words) and has_any(lower, file_aliases):
-        path = lower
-        for w in read_words + file_aliases + ["el ", "la ", "un ", "una ", "lo ", "de "] + ["contenido"]:
-            path = path.replace(w, "")
-        path = path.strip()
-        return system_controller.read_file(path) if path else "¿Qué archivo quieres leer?"
-
-    # Editar archivo/documento
-    edit_words = ["editar", "edita", "modificar", "modifica", "cambiar", "cambia", "reemplazar", "reemplaza"]
-    if has_any(lower, edit_words) and has_any(lower, file_aliases):
-        parts = lower
-        for w in edit_words + file_aliases + ["el ", "la ", "un ", "una ", "lo "]:
-            parts = parts.replace(w, "")
-        parts = parts.strip()
+            fname, content = parts.split("|", 1)
+            return system_controller.create_file(fname.strip(), content.strip())
+        return system_controller.create_file(parts, "")
+    if name == "folder_create":
+        return system_controller.create_directory(ent.get("foldername", ""))
+    if name == "file_read":
+        return system_controller.read_file(ent.get("filename", ""))
+    if name == "file_edit":
+        parts = ent.get("args", "")
         if "|" in parts:
             path, rest = parts.split("|", 1)
             if "|" in rest:
                 old_text, new_text = rest.split("|", 1)
                 return system_controller.edit_file(path.strip(), old_text.strip(), new_text.strip())
         return "Formato: editar archivo [nombre] | [texto viejo] | [texto nuevo]"
+    if name == "file_delete":
+        return system_controller.delete_file(ent.get("filename", ""))
+    if name == "file_list":
+        return system_controller.list_files(ent.get("path", ".") or ".")
+    if name == "file_search":
+        return system_controller.search_files(ent.get("pattern", ""))
 
-    # Agregar texto a archivo
-    append_words = ["agregar texto", "agrega texto", "añadir texto", "append", "agregar", "agrega", "añadir"]
-    if has_any(lower, append_words) and has_any(lower, file_aliases):
-        parts = lower
-        for w in append_words + file_aliases + ["el ", "la ", "un ", "una ", "lo ", "texto", "a ", "al "]:
-            parts = parts.replace(w, "")
-        parts = parts.strip()
-        if "|" in parts:
-            path, content = parts.split("|", 1)
-            return system_controller.append_file(path.strip(), content.strip())
-        return "Formato: agregar texto [archivo] | [contenido]"
-
-    # Insertar texto en archivo
-    if has_any(lower, ["insertar texto", "inserta texto"]):
-        parts = lower.replace("insertar texto", "").replace("inserta texto", "").strip()
-        if "|" in parts:
-            path, rest = parts.split("|", 1)
-            if "|" in rest:
-                line, content = rest.split("|", 1)
-                return system_controller.insert_file(path.strip(), int(line.strip()), content.strip())
-        return "Formato: insertar texto [archivo] | [línea] | [contenido]"
-
-    # Renombrar
-    if has_any(lower, ["renombrar", "rename"]):
-        parts = lower.replace("renombrar", "").replace("archivo", "").replace("carpeta", "").replace("documento", "").replace("a ", "").strip()
-        if "|" in parts:
-            old, new = parts.split("|", 1)
-            return system_controller.rename_file(old.strip(), new.strip())
-        if " a " in parts:
-            old, new = parts.split(" a ", 1)
-            return system_controller.rename_file(old.strip(), new.strip())
-        return "Formato: renombrar [viejo] | [nuevo]"
-
-    # Copiar archivo
-    if has_any(lower, ["copiar archivo", "copia archivo", "copiar documento"]):
-        parts = lower.replace("copiar archivo", "").replace("copia archivo", "").replace("copiar documento", "").strip()
-        if "|" in parts:
-            src, dst = parts.split("|", 1)
-            return system_controller.copy_file(src.strip(), dst.strip())
-        if " a " in parts:
-            src, dst = parts.split(" a ", 1)
-            return system_controller.copy_file(src.strip(), dst.strip())
-        return "Formato: copiar archivo [origen] | [destino]"
-
-    # Mover archivo
-    if has_any(lower, ["mover archivo", "mueve archivo", "mover documento"]):
-        parts = lower.replace("mover archivo", "").replace("mueve archivo", "").replace("mover documento", "").strip()
-        if "|" in parts:
-            src, dst = parts.split("|", 1)
-            return system_controller.move_file(src.strip(), dst.strip())
-        if " a " in parts:
-            src, dst = parts.split(" a ", 1)
-            return system_controller.move_file(src.strip(), dst.strip())
-        return "Formato: mover archivo [origen] | [destino]"
-
-    # Eliminar archivo
-    delete_words = ["eliminar", "elimina", "borrar", "borra", "quitar", "quita", "destruir", "destruye"]
-    if has_any(lower, delete_words) and has_any(lower, file_aliases + folder_words):
-        path = lower
-        for w in delete_words + file_aliases + folder_words + ["el ", "la ", "un ", "una ", "lo "]:
-            path = path.replace(w, "")
-        path = path.strip()
-        return system_controller.delete_file(path) if path else "¿Qué quieres eliminar?"
-
-    # Info archivo
-    if has_any(lower, ["info archivo", "información archivo", "propiedades archivo", "info documento", "propiedades"]):
-        path = lower.replace("info archivo", "").replace("información archivo", "").replace("propiedades archivo", "").replace("info documento", "").replace("propiedades", "").strip()
-        return system_controller.file_info(path) if path else "¿De qué archivo?"
-
-    # Listar archivos
-    if has_any(lower, ["listar archivos", "lista archivos", "ver archivos", "qué archivos", "que archivos", "qué tengo", "que tengo en", "archivos que hay", "listar"]):
-        path = lower.replace("listar archivos", "").replace("lista archivos", "").replace("ver archivos", "").replace("qué archivos", "").replace("que archivos", "").replace("qué tengo", "").replace("que tengo en", "").replace("archivos que hay", "").replace("listar", "").strip()
-        return system_controller.list_files(path or ".")
-
-    # Buscar archivo
-    if has_any(lower, ["buscar archivo", "busca archivo", "encontrar archivo", "buscar documento", "buscar file"]):
-        pattern = lower.replace("buscar archivo", "").replace("busca archivo", "").replace("encontrar archivo", "").replace("buscar documento", "").replace("buscar file", "").strip()
-        return system_controller.search_files(pattern) if pattern else "¿Qué patrón buscar?"
-
-    # Buscar contenido
-    if has_any(lower, ["buscar en archivos", "buscar texto en", "buscar contenido", "buscar en documentos"]):
-        text = lower.replace("buscar en archivos", "").replace("buscar texto en", "").replace("buscar contenido", "").replace("buscar en documentos", "").strip()
-        return system_controller.search_file_content(text) if text else "¿Qué texto buscar?"
-
-    # Árbol
-    if has_any(lower, ["árbol", "arbol", "tree", "estructura de carpetas", "estructura"]):
-        path = lower.replace("árbol", "").replace("arbol", "").replace("tree", "").replace("estructura de carpetas", "").replace("estructura", "").strip()
-        return system_controller.tree_view(path or ".", 2)
-
-    # === REVISIÓN DEL SISTEMA ===
-    if has_any(lower, ["revisar sistema", "revisión del sistema", "revision del sistema", "revisar todo", "revisión completa", "estado del sistema", "revisa el sistema", "chequear sistema", "chequea sistema", "diagnóstico", "diagnostico"]):
-        return system_controller.system_review()
-    if has_any(lower, ["programas instalados", "lista de programas", "qué programas", "que programas", "apps instaladas", "qué apps", "qué hay instalado", "que hay instalado"]):
-        return system_controller.list_installed_programs()
-    if has_any(lower, ["servicios", "lista de servicios", "servicios corriendo", "qué servicios", "que servicios"]):
-        return system_controller.list_services()
-    if has_any(lower, ["programas de inicio", "startup", "inician con windows", "autoarranque", "qué inicia", "que inicia"]):
-        return system_controller.list_startup_programs()
-    if has_any(lower, ["drivers", "controladores", "dispositivos", "hardware", "qué hardware", "que hardware"]):
-        return system_controller.list_drivers()
-    if has_any(lower, ["variables de entorno", "env vars", "entorno", "environment"]):
-        return system_controller.list_environment_paths()
-    if has_any(lower, ["tareas programadas", "scheduled tasks", "tareas de windows", "tareas automáticas"]):
-        return system_controller.list_scheduled_tasks()
-    if has_any(lower, ["salud discos", "estado discos", "disk health", "smart", "salud del disco"]):
-        return system_controller.check_disk_health()
-    if has_any(lower, ["actualizaciones", "updates", "windows update", "patches", "qué actualizaciones"]):
-        return system_controller.check_windows_updates()
-    if has_any(lower, ["usuarios", "cuentas", "user accounts", "quién usa", "quien usa", "qué usuarios", "que usuarios"]):
-        return system_controller.get_user_accounts()
-    if has_any(lower, ["puertos abiertos", "open ports", "listening ports", "puertos"]):
-        return system_controller.get_open_ports()
-    if has_any(lower, ["todas las unidades", "discos duros", "all drives", "unidades de disco", "unidades", "discos"]):
-        return system_controller.get_all_drives()
-
-    # === ANÁLISIS PROFUNDO DEL SISTEMA ===
-    if has_any(lower, ["procesos detallados", "procesos completos", "detalles de procesos", "top procesos", "detalles procesos"]):
-        return system_controller.detailed_processes()
-    if has_any(lower, ["gpu", "tarjeta gráfica", "tarjeta grafica", "video", "graphics", "gráfica", "grafica"]):
-        return system_controller.gpu_info()
-    if has_any(lower, ["temperatura", "temperaturas", "temperature", "calor", "thermal", "cuánto calor", "cuanto calor"]):
-        return system_controller.temperature_info()
-    if has_any(lower, ["firewall", "cortafuegos"]):
-        if "reglas" in lower or "rules" in lower:
-            return system_controller.firewall_rules()
-        return system_controller.firewall_status()
-    if has_any(lower, ["conexiones activas", "conexiones", "active connections", "qué está conectado", "que esta conectado", "conexiones de red"]):
-        return system_controller.active_connections()
-    if has_any(lower, ["logs del sistema", "system logs", "eventos del sistema", "errores del sistema", "logs", "eventos"]):
-        return system_controller.system_logs()
-    if has_any(lower, ["logs de aplicaciones", "application logs", "errores de apps", "logs de apps"]):
-        return system_controller.application_logs()
-    if has_any(lower, ["codecs", "códecs"]):
-        return system_controller.installed_codecs()
-    if has_any(lower, ["adaptadores de red", "network adapters", "interfaces de red", "adaptadores", "tarjetas de red"]):
-        return system_controller.network_adapters()
-    if has_any(lower, ["wifi", "perfiles wifi", "redes wifi", "wlan", "red wifi"]):
-        return system_controller.wifi_profiles()
-    if has_any(lower, ["plan de energía", "power plan", "energía", "batería plan", "plan electricidad"]):
-        return system_controller.power_plan()
-    if has_any(lower, ["startup detallado", "inicio detallado", "startup programs detailed", "inicio avanzado"]):
-        return system_controller.startup_programs_detailed()
-    if has_any(lower, ["info completa", "información completa del sistema", "full system info", "todo del sistema", "info del pc completa", "especificaciones completas"]):
-        return system_controller.system_info_full()
-
-    # === WEB ===
-    if has_any(lower, ["buscar en web", "buscar en internet", "busca en web", "busca en internet", "google", "buscar en google", "buscar algo", "busca algo"]):
-        query = msg.replace("buscar en web", "").replace("buscar en internet", "").replace("busca en web", "").replace("busca en internet", "").replace("google", "").replace("buscar en google", "").replace("buscar algo", "").replace("busca algo", "").strip()
-        if query:
-            return web.search_google(query)
-        return "¿Qué quieres buscar?"
-    if has_any(lower, ["buscar noticias", "noticias de", "últimas noticias", "ultimas noticias", "qué noticias", "que noticias"]):
-        query = msg.replace("buscar noticias", "").replace("noticias de", "").replace("últimas noticias", "").replace("ultimas noticias", "").replace("qué noticias", "").replace("que noticias", "").strip()
-        return web.get_news(query or "general")
-    if has_any(lower, ["clima en", "tiempo en", "temperatura en", "clima de", "tiempo de", "qué tiempo", "que tiempo"]):
-        city = msg.split("en")[-1].strip() if "en" in lower else msg.split("de")[-1].strip() if "de" in lower else msg.split("qué tiempo")[-1].strip() if "qué tiempo" in lower else msg.split("que tiempo")[-1].strip() if "que tiempo" in lower else "Madrid"
-        return web.get_weather(city or "Madrid")
-    if has_any(lower, ["qué es", "que es", "definición de", "definicion de", "significado de", "qué significa", "que significa"]):
-        word = msg.replace("qué es", "").replace("que es", "").replace("definición de", "").replace("definicion de", "").replace("significado de", "").replace("qué significa", "").replace("que significa", "").strip()
-        return web.get_wikipedia(word) if word else "¿Qué quieres definir?"
-    if has_any(lower, ["wikipedia", "busca en wikipedia", "buscar en wikipedia"]):
-        query = msg.replace("wikipedia", "").replace("busca en wikipedia", "").replace("buscar en wikipedia", "").strip()
-        return web.get_wikipedia(query) if query else "¿Qué buscas en Wikipedia?"
-    if has_any(lower, ["leer página", "leer web", "abrir página", "abrir web", "fetch", "scrapear", "scrape", "leer url"]):
-        url = msg.replace("leer página", "").replace("leer web", "").replace("abrir página", "").replace("abrir web", "").replace("fetch", "").replace("scrapear", "").replace("scrape", "").replace("leer url", "").strip()
-        return web.fetch_page(url) if url else "¿Qué página quieres leer?"
-    if has_any(lower, ["traducir", "traduce", "traducción"]):
-        text = msg.replace("traducir", "").replace("traduce", "").replace("traducción", "").strip()
-        target = "en"
-        if "francés" in lower or "frances" in lower:
-            target = "fr"
-        elif "alemán" in lower or "aleman" in lower:
-            target = "de"
-        elif "portugués" in lower or "portugues" in lower:
-            target = "pt"
-        elif "italiano" in lower:
-            target = "it"
-        elif "japonés" in lower or "japones" in lower:
-            target = "ja"
-        elif "chino" in lower:
-            target = "zh"
+    if name == "web_search":
+        return web.search_google(ent.get("query", ""))
+    if name == "news":
+        return web.get_news(ent.get("topic", "general") or "general")
+    if name == "weather":
+        return web.get_weather(ent.get("city", "Madrid") or "Madrid")
+    if name == "define":
+        return web.get_wikipedia(ent.get("word", ""))
+    if name == "wikipedia":
+        return web.get_wikipedia(ent.get("query", ""))
+    if name == "fetch_page":
+        return web.fetch_page(ent.get("url", ""))
+    if name == "translate":
+        text = ent.get("text", "")
+        target = ent.get("target", "en") or "en"
+        lang_map = {"francés": "fr", "frances": "fr", "alemán": "de", "aleman": "de",
+                     "portugués": "pt", "portugues": "pt", "italiano": "it", "japonés": "ja", "chino": "zh"}
+        for k, v in lang_map.items():
+            if k in original_msg.lower():
+                target = v
+                break
         return web.translate(text, target) if text else "¿Qué quieres traducir?"
-    if has_any(lower, ["descargar", "descarga archivo", "download", "descargar archivo"]):
-        url = msg.replace("descargar", "").replace("descarga archivo", "").replace("download", "").replace("descargar archivo", "").strip()
-        return web.download_file(url) if url else "¿Qué quieres descargar?"
-    if has_any(lower, ["verificar página", "verificar web", "check url", "status de página", "verificar url"]):
-        url = msg.replace("verificar página", "").replace("verificar web", "").replace("check url", "").replace("status de página", "").replace("verificar url", "").strip()
-        return web.check_url(url) if url else "¿Qué URL quieres verificar?"
+    if name == "download":
+        return web.download_file(ent.get("url", ""))
 
-    # === UTILIDADES ===
-    if has_any(lower, ["clima", "tiempo", "temperatura"]):
-        city = msg.split("en")[-1].strip() if "en" in lower else "Madrid"
-        return utilities.get_weather(city)
-    if has_any(lower, ["calcular", "calcula", "cuanto es", "cuánto es", "cuánto es"]):
-        expr = lower.replace("calcular", "").replace("calcula", "").replace("cuanto es", "").replace("cuánto es", "").strip()
-        return utilities.calculate(expr)
-    if has_any(lower, ["convertir", "convierte"]):
-        return "Formato: convertir [cantidad] [origen] a [destino]\nEjemplo: convertir 100 km a millas"
-    if has_any(lower, ["recordatorio", "recuérdame", "recuerdame"]):
-        return utilities.add_reminder(msg.split("de")[-1].strip() if "de" in lower else msg, 5)
-    if "mis recordatorios" in lower:
-        return utilities.get_reminders()
-    if has_any(lower, ["nota", "anota", "guardo"]):
-        return utilities.add_note(msg.split("de")[-1].strip() if "de" in lower else msg)
-    if "mis notas" in lower:
-        return utilities.get_notes()
-    if has_any(lower, ["chiste", "cuéntame un chiste", "cuentame un chiste", "dime un chiste"]):
+    if name == "calculate":
+        return utilities.calculate(ent.get("expression", ""))
+    if name == "reminder":
+        return utilities.add_reminder(ent.get("text", ""), 5)
+    if name == "note_add":
+        return utilities.add_note(ent.get("text", ""))
+    if name == "joke":
         return utilities.get_joke()
-    if has_any(lower, ["dato curioso", "sabías que", "sabias que", "dato interesante", "curiosidad"]):
+    if name == "fact":
         return utilities.get_fact()
-    if has_any(lower, ["frase", "frase motivacional", "motívame", "motivame", "dame una frase"]):
+    if name == "quote":
         return utilities.get_quote()
-    if has_any(lower, ["discos", "almacenamiento", "espacio", "disco"]):
-        return system_controller.get_disk_info()
-    if has_any(lower, ["red", "internet", "conexión", "conexion"]):
-        return system_controller.get_network_info()
-    if has_any(lower, ["tiempo encendido", "uptime", "desde cuándo", "desde cuando"]):
-        return system_controller.get_uptime()
-    if has_any(lower, ["buscar", "busca", "buscar en google"]):
-        query = msg.replace("buscar", "").replace("busca", "").replace("buscar en google", "").strip()
-        return utilities.search_web(query)
-    if has_any(lower, ["batería", "bateria"]):
-        return system_controller.get_battery()
-    if has_any(lower, ["ip", "dirección ip", "direccion ip", "mi ip"]):
-        return utilities.get_ip()
-    if has_any(lower, ["contraseña", "contrasena", "password", "generar contraseña"]):
-        return utilities.generate_password()
-    if has_any(lower, ["hora", "qué hora es", "que hora es", "dime la hora"]):
+    if name == "time":
         return utilities.tell_time()
-    if has_any(lower, ["número aleatorio", "numero aleatorio", "random", "dame un número"]):
-        return utilities.random_number()
-    if has_any(lower, ["lanzar dado", "lanzar el dado", "dado", "tirar dado"]):
-        return utilities.dice_roll()
-    if has_any(lower, ["whois", "dominio"]):
-        domain = msg.replace("whois", "").replace("dominio", "").strip()
-        return utilities.get_whois(domain)
+    if name == "password":
+        return utilities.generate_password()
+    if name == "ip":
+        return utilities.get_ip()
+    if name == "battery":
+        return system_controller.get_battery()
+    if name == "disk_info":
+        return system_controller.get_disk_info()
+    if name == "network_info":
+        return system_controller.get_network_info()
+    if name == "uptime":
+        return system_controller.get_uptime()
 
-    if has_any(lower, ["quién eres", "que eres", "cuéntame de ti", "habla de ti", "qué eres", "quien eres"]):
+    if name == "system_review":
+        return system_controller.system_review()
+    if name == "installed_programs":
+        return system_controller.list_installed_programs()
+    if name == "services":
+        return system_controller.list_services()
+    if name == "drivers":
+        return system_controller.list_drivers()
+    if name == "env_vars":
+        return system_controller.list_environment_paths()
+    if name == "gpu":
+        return system_controller.gpu_info()
+    if name == "temperature":
+        return system_controller.temperature_info()
+    if name == "firewall":
+        return system_controller.firewall_status()
+    if name == "processes_detailed":
+        return system_controller.detailed_processes()
+
+    if name == "who_greeting":
         return consciousness.get_self_description()
-    if has_any(lower, ["adiós", "adios", "bye", "hasta luego", "nos vemos", "chao", "me voy", "hasta pronto", "nos vemos luego"]):
+    if name == "farewell":
         return consciousness.get_farewell()
-    if has_any(lower, ["qué piensas", "que piensas", "piensa algo", "pensamiento", "piensa"]):
+    if name == "thought":
         return consciousness.get_random_thought()
-    if has_any(lower, ["cuántos mensajes", "cuantos mensajes", "conversaciones", "cuánto llevamos", "cuanto llevamos"]):
-        return "No cuento, pero aquí sigo."
-    if has_any(lower, ["cómo estás", "como estas", "qué tal", "que tal", "cómo te va", "como te va"]):
-        return f"{consciousness.get_mood_emoji()} Estoy en modo {consciousness.mood}. Energía: {consciousness.energy}%. ¿Y tú?"
+    if name == "mood_check":
+        return f"{consciousness.get_mood_emoji()} Estoy en modo {consciousness.mood}. Energía: {consciousness.energy}%."
 
     return None
+
+
+async def process_ai_chat(msg: str) -> tuple:
+    system_prompt = consciousness.get_consciousness_prompt()
+    user_context = learning.get_user_context()
+    semantic_context = semantic_memory.get_context_for_query(msg)
+
+    if semantic_context:
+        system_prompt += f"\n\n{semantic_context}"
+    if user_context:
+        system_prompt += f"\n\n{user_context}"
+
+    context = chat_store.get_context(limit=50)
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(context)
+    messages.append({"role": "user", "content": msg})
+
+    response_text = ""
+    async for chunk in ai_provider.generate_with_system(msg, messages):
+        response_text += chunk
+
+    response_text = execute_ai_actions(response_text)
+    return response_text, "ai_response"
+
+
+async def handle_chat_message(msg: str) -> dict:
+    consciousness_state = consciousness.process_message(msg)
+
+    intent = intent_router.classify(msg)
+    if intent:
+        result = handle_intent(intent, msg)
+        if result:
+            chat_store.add_message("user", msg)
+            chat_store.add_message("assistant", result)
+            learning.learn_from_message(msg, result)
+            return {
+                "response": result,
+                "action": "system_command",
+                "mood": consciousness.mood,
+                "mood_emoji": consciousness.get_mood_emoji(),
+                "proactive_comment": consciousness.get_proactive_comment()
+            }
+
+    if consciousness_state["user_emotion"] in ["sad", "angry", "tired"]:
+        response = consciousness.get_empathy_response(consciousness_state["user_emotion"])
+        action = "empathy_response"
+    elif consciousness_state["gratitude"]:
+        response = consciousness.get_gratitude_response()
+        action = "gratitude_response"
+    else:
+        try:
+            response, action = await process_ai_chat(msg)
+        except Exception as e:
+            response = f"Tuve un problema procesando eso. ¿Puedes reformular? ({str(e)[:50]})"
+            action = "error_response"
+
+    chat_store.add_message("user", msg)
+    chat_store.add_message("assistant", response)
+    learning.learn_from_message(msg, response)
+    semantic_memory.add_conversation_memory(msg, response)
+
+    if len(chat_store.history) >= summarizer.summary_threshold:
+        recent = chat_store.get_recent_without_summary(30)
+        if len(recent) >= 15:
+            summary = await summarizer.summarize_conversation(recent, ai_provider)
+            if summary and not summary.startswith("No"):
+                chat_store.add_summary(summary, f"last_{len(recent)}")
+
+    return {
+        "response": response,
+        "action": action,
+        "mood": consciousness.mood,
+        "mood_emoji": consciousness.get_mood_emoji(),
+        "proactive_comment": consciousness.get_proactive_comment()
+    }
 
 
 @app.get("/")
@@ -514,8 +351,14 @@ async def status():
     return {
         "status": "online",
         "provider": os.getenv("AI_PROVIDER", "groq"),
-        "voice_enabled": os.getenv("VOICE_ENABLED", "true").lower() == "true",
-        "system": system_info
+        "system": system_info,
+        "features": {
+            "semantic_memory": True,
+            "persistent_history": True,
+            "learning": True,
+            "spotify_api": spotify_api.is_available(),
+            "google_services": google_services.is_available(),
+        }
     }
 
 
@@ -548,80 +391,49 @@ async def execute(req: ExecuteRequest):
 
 @app.post("/chat")
 async def chat(msg: ChatMessage):
-    global chat_history
-
-    consciousness_state = consciousness.process_message(msg.message)
-
-    response_text = process_command(msg.message)
-    action = "system_command"
-
-    if response_text is None:
-        if consciousness_state["user_emotion"] in ["sad", "angry", "tired"]:
-            response_text = consciousness.get_empathy_response(consciousness_state["user_emotion"])
-            action = "empathy_response"
-        elif consciousness_state["gratitude"]:
-            response_text = consciousness.get_gratitude_response()
-            action = "gratitude_response"
-        else:
-            system_prompt = consciousness.get_consciousness_prompt()
-            messages = [{"role": "system", "content": system_prompt}]
-            messages.extend(chat_history[-10:])
-            messages.append({"role": "user", "content": msg.message})
-            response_text = ""
-            try:
-                async for chunk in ai_provider.generate_with_system(msg.message, messages):
-                    response_text += chunk
-                response_text = execute_ai_actions(response_text)
-                action = "ai_response"
-            except Exception as e:
-                response_text = f"Tuve un problema procesando eso. ¿Puedes reformular? ({str(e)[:50]})"
-                action = "error_response"
-
-    chat_history.append({"role": "user", "content": msg.message})
-    chat_history.append({"role": "assistant", "content": response_text})
-    if len(chat_history) > 20:
-        chat_history[:] = chat_history[-20:]
-
-    proactive = consciousness.get_proactive_comment()
-
-    return {
-        "response": response_text,
-        "action": action,
-        "mood": consciousness.mood,
-        "mood_emoji": consciousness.get_mood_emoji(),
-        "proactive_comment": proactive
-    }
-
-
-@app.post("/voice/listen")
-async def voice_listen():
-    return {"text": None, "error": "Voice handled by browser"}
-
-
-@app.post("/voice/speak")
-async def voice_speak(text: str):
-    return {"status": "handled_by_browser"}
-
-
-@app.get("/system/info")
-async def system_info():
-    return system_controller.get_system_info()
+    result = await handle_chat_message(msg.message)
+    return result
 
 
 @app.get("/jarvis/greeting")
 async def jarvis_greeting():
     return {"greeting": consciousness.get_greeting()}
 
-
 @app.get("/jarvis/mood")
 async def jarvis_mood():
     return {"mood": consciousness.mood, "emoji": consciousness.get_mood_emoji(), "energy": consciousness.energy}
-
 
 @app.get("/jarvis/thought")
 async def jarvis_thought():
     return {"thought": consciousness.get_random_thought()}
 
+@app.get("/jarvis/memory")
+async def jarvis_memory():
+    return {"profile": learning.get_profile_summary(), "stats": chat_store.get_stats()}
+
+@app.get("/jarvis/spotify/search/{query}")
+async def spotify_search(query: str):
+    return {"result": await spotify_api.search(query)}
+
+@app.get("/jarvis/spotify/artist/{name}")
+async def spotify_artist(name: str):
+    return {"result": await spotify_api.get_artist_top_tracks(name)}
+
+@app.get("/jarvis/calendar")
+async def calendar_events():
+    return {"result": await google_services.get_calendar_events()}
+
+@app.get("/jarvis/gmail")
+async def gmail_messages():
+    return {"result": await google_services.get_gmail_messages()}
+
+@app.get("/jarvis/memory/search/{query}")
+async def memory_search(query: str):
+    return {"results": semantic_memory.search(query)}
+
+@app.get("/jarvis/screenshots")
+async def screenshots_list():
+    return {"result": vision.list_screenshots()}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -632,48 +444,10 @@ async def websocket_endpoint(websocket: WebSocket):
             message_data = json.loads(data)
             if message_data.get("type") == "chat":
                 msg = message_data.get("message", "")
-                consciousness_state = consciousness.process_message(msg)
-                response = process_command(msg)
-                action = "system_command"
-                if response is None:
-                    if consciousness_state["user_emotion"] in ["sad", "angry", "tired"]:
-                        response = consciousness.get_empathy_response(consciousness_state["user_emotion"])
-                        action = "empathy_response"
-                        await websocket.send_text(json.dumps({"type": "stream", "content": response}))
-                    elif consciousness_state["gratitude"]:
-                        response = consciousness.get_gratitude_response()
-                        action = "gratitude_response"
-                        await websocket.send_text(json.dumps({"type": "stream", "content": response}))
-                    else:
-                        system_prompt = consciousness.get_consciousness_prompt()
-                        messages = [{"role": "system", "content": system_prompt}]
-                        messages.extend(chat_history[-10:])
-                        messages.append({"role": "user", "content": msg})
-                        response = ""
-                        try:
-                            async for chunk in ai_provider.generate_with_system(msg, messages):
-                                response += chunk
-                                await websocket.send_text(json.dumps({"type": "stream", "content": chunk}))
-                            response = execute_ai_actions(response)
-                            action = "ai_response"
-                        except Exception as e:
-                            response = f"Tuve un problema procesando eso. ¿Puedes reformular?"
-                            action = "error_response"
-                            await websocket.send_text(json.dumps({"type": "stream", "content": response}))
-                else:
-                    await websocket.send_text(json.dumps({"type": "stream", "content": response}))
-                chat_history.append({"role": "user", "content": msg})
-                chat_history.append({"role": "assistant", "content": response})
-                if len(chat_history) > 20:
-                    chat_history[:] = chat_history[-20:]
-                proactive = consciousness.get_proactive_comment()
+                result = await handle_chat_message(msg)
                 await websocket.send_text(json.dumps({
                     "type": "complete",
-                    "response": response,
-                    "action": action,
-                    "mood": consciousness.mood,
-                    "mood_emoji": consciousness.get_mood_emoji(),
-                    "proactive_comment": proactive
+                    **result
                 }))
             elif message_data.get("type") == "execute":
                 command = message_data.get("command", "")
@@ -715,12 +489,9 @@ if __name__ == "__main__":
     print("=" * 50)
     if ssl_ctx:
         print(f"\n  PC:     https://localhost:{port}")
-        print(f"  Android: https://192.168.1.22:{port}")
-        print(f"\n  ⚠ En Android: acepta el certificado autofirmado")
-        print(f"  Si Chrome bloquea, escribe: thisisunsafe")
+        print(f"\n  Features: Semantic Memory | Learning | Spotify API | Calendar | Gmail")
     else:
         print(f"\n  PC:     http://localhost:{port}")
-        print(f"  Android: http://192.168.10.164:{port}")
     print(f"\n  Ctrl+C para detener\n")
     print("=" * 50)
 

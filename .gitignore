@@ -26,6 +26,9 @@ backend/.env
 # Memory file
 backend/jarvis_memory.json
 
+# Runtime data (chat history, user profiles, etc.)
+backend/data/
+
 # Workspace files
 backend/workspace/
 
