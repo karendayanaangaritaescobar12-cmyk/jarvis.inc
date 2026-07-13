@@ -25,6 +25,7 @@ from google_services import google_services
 from vision import vision
 from task_executor import task_executor
 from natural_voice import natural_voice
+from self_monitor import self_monitor
 
 load_dotenv()
 
@@ -337,11 +338,19 @@ async def process_ai_chat(msg: str) -> tuple:
     system_prompt = consciousness.get_consciousness_prompt()
     user_context = learning.get_user_context()
     semantic_context = semantic_memory.get_context_for_query(msg)
+    monitor_context = self_monitor.get_anticipation_context()
 
     if semantic_context:
         system_prompt += f"\n\n{semantic_context}"
     if user_context:
         system_prompt += f"\n\n{user_context}"
+    if monitor_context:
+        system_prompt += f"\n\nCONTEXTO DEL SISTEMA: {monitor_context}"
+
+    similar_memories = consciousness.search_similar_memories(msg, limit=3)
+    if similar_memories:
+        memory_str = "\n".join([f"- {m.get('text', '')[:100]}" for m in similar_memories])
+        system_prompt += f"\n\nMEMORIAS SIMILARES:\n{memory_str}"
 
     context = chat_store.get_context(limit=50)
     messages = [{"role": "system", "content": system_prompt}]
@@ -503,6 +512,29 @@ async def upload_file(file: UploadFile = File(...), path: str = ""):
         return {"result": f"Archivo guardado: {save_path} ({size_kb:.1f} KB)", "path": save_path}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/jarvis/monitor")
+async def jarvis_monitor():
+    return self_monitor.get_system_status()
+
+
+@app.get("/jarvis/report")
+async def jarvis_report():
+    return {"report": self_monitor.generate_report()}
+
+
+@app.get("/jarvis/anticipation")
+async def jarvis_anticipation():
+    return {"context": self_monitor.get_anticipation_context()}
+
+
+@app.get("/jarvis/memories")
+async def jarvis_memories(q: str = ""):
+    if q:
+        results = consciousness.search_similar_memories(q)
+        return {"memories": results}
+    return {"memories": consciousness.vectors.get("embeddings", [])[-10:]}
 
 
 @app.get("/jarvis/greeting")
