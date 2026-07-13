@@ -71,8 +71,9 @@ def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
     ent = intent.entities
 
     if name == "spotify_play":
-        if "spotify" in original_msg.lower():
-            return system_controller.open_spotify()
+        query = ent.get("query", "").strip()
+        if query:
+            return system_controller.spotify_search_and_play(query)
         return system_controller.open_spotify()
     if name == "spotify_next":
         return system_controller.spotify_next()

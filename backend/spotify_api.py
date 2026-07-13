@@ -47,7 +47,7 @@ class SpotifyAPI:
 
         try:
             async with httpx.AsyncClient() as client:
-                resp = client.get(
+                resp = await client.get(
                     f"{self.api_base}/search",
                     params={"q": query, "type": search_type, "limit": limit},
                     headers=self._headers(),
@@ -83,7 +83,7 @@ class SpotifyAPI:
 
         try:
             async with httpx.AsyncClient() as client:
-                resp = client.get(
+                resp = await client.get(
                     f"{self.api_base}/tracks/{track_id}",
                     headers=self._headers(),
                     timeout=10
@@ -102,14 +102,13 @@ class SpotifyAPI:
             return f"Error: {str(e)[:100]}"
 
     async def get_artist_top_tracks(self, artist_name: str) -> str:
-        search_result = await self.search(artist_name, "artist", 1)
-        if "No encontré" in search_result:
-            return search_result
+        token = self._get_token()
+        if not token:
+            return "Spotify API no configurado."
 
         try:
-            token = self._get_token()
             async with httpx.AsyncClient() as client:
-                search_resp = client.get(
+                search_resp = await client.get(
                     f"{self.api_base}/search",
                     params={"q": artist_name, "type": "artist", "limit": 1},
                     headers=self._headers(),
@@ -119,7 +118,7 @@ class SpotifyAPI:
                     artists = search_resp.json().get("artists", {}).get("items", [])
                     if artists:
                         artist_id = artists[0]["id"]
-                        top_resp = client.get(
+                        top_resp = await client.get(
                             f"{self.api_base}/artists/{artist_id}/top-tracks",
                             params={"country": "CO"},
                             headers=self._headers(),
@@ -148,7 +147,7 @@ class SpotifyAPI:
                 params["seed_genres"] = seed_genres
 
             async with httpx.AsyncClient() as client:
-                resp = client.get(
+                resp = await client.get(
                     f"{self.api_base}/recommendations",
                     params=params,
                     headers=self._headers(),

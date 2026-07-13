@@ -19,8 +19,8 @@ class IntentRouter:
     def _build_intents(self):
         return {
             "spotify_play": {
-                "patterns": [r"(?:reproducir|poner\s+m[uú]sica|play|reproduce|pon\s+la\s+m[uú]sica)"],
-                "entities": {}
+                "patterns": [r"(?:reproducir|poner\s+m[uú]sica|play|reproduce|pon\s+la\s+m[uú]sica)\s*(.*)"],
+                "entities": {"query": 1}
             },
             "spotify_next": {
                 "patterns": [r"(?:siguiente|next|saltar)(?:\s+canci[oó]n)?", r"spotify\s+siguiente"],

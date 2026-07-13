@@ -758,6 +758,19 @@ class SystemController:
                 continue
         return "No encontré Spotify."
 
+    def spotify_search_and_play(self, query: str) -> str:
+        if self.system == "windows":
+            try:
+                subprocess.Popen(["cmd", "/c", "start", "", f"spotify:search:{query}"])
+                import time
+                time.sleep(2)
+                self._send_media_key(0xB3)
+                return f"🎵 Buscando y reproduciendo '{query}' en Spotify."
+            except:
+                pass
+        webbrowser.open(f"https://open.spotify.com/search/{query.replace(' ', '%20')}")
+        return f"Buscando '{query}' en Spotify (se abrió en navegador)."
+
     def spotify_play_pause(self) -> str:
         self._send_media_key(0xB3)
         return "Play/Pause enviado."
@@ -787,10 +800,22 @@ class SystemController:
         return "Medios silenciados."
 
     def spotify_open_artist(self, artist: str) -> str:
+        if self.system == "windows":
+            try:
+                subprocess.Popen(["cmd", "/c", "start", "", f"spotify:search:{artist}"])
+                return f"🎵 Buscando '{artist}' en Spotify."
+            except:
+                pass
         webbrowser.open(f"https://open.spotify.com/search/{artist.replace(' ', '%20')}")
         return f"Buscando '{artist}' en Spotify."
 
     def spotify_open_playlist(self, playlist: str) -> str:
+        if self.system == "windows":
+            try:
+                subprocess.Popen(["cmd", "/c", "start", "", f"spotify:search:{playlist}"])
+                return f"🎵 Buscando playlist '{playlist}' en Spotify."
+            except:
+                pass
         webbrowser.open(f"https://open.spotify.com/search/{playlist.replace(' ', '%20')}")
         return f"Buscando playlist '{playlist}' en Spotify."
 
