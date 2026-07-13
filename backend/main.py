@@ -52,16 +52,43 @@ class ExecuteRequest(BaseModel):
 
 
 def execute_ai_actions(text: str) -> str:
-    exec_pattern = r'\[EXEC:\s*(.+?)\]'
-    matches = re.findall(exec_pattern, text)
+    patterns = {
+        'EXEC': (r'\[EXEC:\s*(.+?)\]', 'exec'),
+        'CREATE': (r'\[CREATE:\s*(.+?)\]\n(.*?)(?=\[|\Z)', 'create'),
+        'READ': (r'\[READ:\s*(.+?)\]', 'read'),
+        'INSTALL': (r'\[INSTALL:\s*(.+?)\]', 'install'),
+        'OPEN': (r'\[OPEN:\s*(.+?)\]', 'open'),
+        'SEARCH': (r'\[SEARCH:\s*(.+?)\]', 'search'),
+    }
     results = []
-    for cmd in matches:
-        cmd = cmd.strip()
-        output = system_controller.run_powershell(cmd) if not any(
-            x in cmd.lower() for x in ["pip ", "npm ", "apt ", "winget "]
-        ) else system_controller.run_cmd(cmd)
-        results.append(f"[Resultado de '{cmd}']:\n{output}")
-    text = re.sub(exec_pattern, '', text).strip()
+    for tag, (pattern, action) in patterns.items():
+        matches = re.findall(pattern, text, re.DOTALL)
+        for match in matches:
+            if action == 'exec':
+                cmd = match.strip()
+                output = system_controller.run_powershell(cmd) if not any(
+                    x in cmd.lower() for x in ["pip ", "npm ", "apt ", "winget "]
+                ) else system_controller.run_cmd(cmd)
+                results.append(f"[{cmd}]:\n{output}")
+            elif action == 'create':
+                fname = match[0].strip() if isinstance(match, tuple) else match.strip()
+                content = match[1].strip() if isinstance(match, tuple) and len(match) > 1 else ""
+                output = system_controller.create_file(fname, content)
+                results.append(output)
+            elif action == 'read':
+                output = system_controller.read_file(match.strip())
+                results.append(f"Contenido de {match.strip()}:\n{output}")
+            elif action == 'install':
+                output = system_controller.install_package(match.strip())
+                results.append(output)
+            elif action == 'open':
+                output = system_controller.open_app(match.strip())
+                results.append(output)
+            elif action == 'search':
+                output = system_controller.search_file_content(match.strip())
+                results.append(output)
+    for pattern, _ in patterns.values():
+        text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
     if results:
         text += "\n\n" + "\n".join(results)
     return text
@@ -146,6 +173,15 @@ async def handle_intent(intent: Intent, original_msg: str) -> Optional[str]:
         if "|" in parts:
             fname, content = parts.split("|", 1)
             return system_controller.create_file(fname.strip(), content.strip())
+        import re as _re
+        m = _re.search(r'(\S+\.\w+)', parts)
+        if m:
+            fname = m.group(1)
+            rest = parts[m.end():].strip()
+            if rest.startswith("con "):
+                rest = rest[4:].strip()
+            content = rest if rest else ""
+            return system_controller.create_file(fname, content)
         return system_controller.create_file(parts, "")
     if name == "folder_create":
         return system_controller.create_directory(ent.get("foldername", ""))

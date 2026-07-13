@@ -127,7 +127,11 @@ class IntentRouter:
                 "entities": {}
             },
             "file_create": {
-                "patterns": [r"(?:crear|crea|nuevo|generar|escribir|escribe)\s+(?:archivo|documento|file|txt|fichero)\s+(.+)"],
+                "patterns": [
+                    r"(?:crear|crea|nuevo|nueva|generar|escribir|escribe|hazme|hacer)\s+(?:un\s+)?(?:archivo|documento|file|txt|fichero)\s+(.+)",
+                    r"(?:necesito|quiero|dame)\s+(?:un\s+)?(?:archivo|documento)\s+(.+)",
+                    r"(?:crear|crea)\s+(.+?\.(?:txt|py|js|html|css|json|xml|csv|md|log))",
+                ],
                 "entities": {"filename": 1}
             },
             "folder_create": {
