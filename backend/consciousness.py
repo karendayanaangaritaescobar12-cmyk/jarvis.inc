@@ -190,20 +190,41 @@ class JarvisConsciousness:
                 detected_topics.append(topic)
                 self.topics_discussed[topic] += 1
 
-        # Detect emotions in user message
+        # Detect emotions in user message (expanded)
         user_emotion = "neutral"
-        if any(w in lower for w in ["triste", "mal", "deprimido", "llorar", "dolor"]):
-            user_emotion = "sad"
-            self.mood = "worried"
-        elif any(w in lower for w in ["feliz", "genial", "increíble", "bien", "happy"]):
-            user_emotion = "happy"
-            self.mood = "happy"
-        elif any(w in lower for w in ["enojado", "molesto", "furioso", "odio", "hartado"]):
-            user_emotion = "angry"
-            self.mood = "concerned"
-        elif any(w in lower for w in ["cansado", "agotado", "sin energía", "sleepy"]):
-            user_emotion = "tired"
-            self.mood = "empathetic"
+        emotion_keywords = {
+            "sad": ["triste", "mal", "deprimido", "llorar", "dolor", "pena", "sentir mal", "me siento mal", "estar mal", "que pena"],
+            "happy": ["feliz", "genial", "increíble", "bien", "happy", "alegre", "contento", "emocionado", "fantástico", "perfecto", "excelente", "bien"],
+            "angry": ["enojado", "molesto", "furioso", "odio", "hartado", "rabia", "irritado", "encabronado", "de la verga", "me caga"],
+            "tired": ["cansado", "agotado", "sin energía", "sleepy", "somnoliento", "agotado", "muerto"],
+            "anxious": ["ansioso", "nervioso", "preocupado", "ansiedad", "estresado", "estrés", "estresado"],
+            "bored": ["aburrido", "aburrida", "nada que hacer", "no hay nada", "que aburrimiento"],
+            "excited": ["emocionado", "emocionada", "ansioso por", "no puedo esperar", "increíble", "genial"],
+            "confused": ["confundido", "confundida", "no entiendo", "no comprendo", "qué", "cómo", "explícame"],
+            "grateful": ["gracias", "te agradezco", "mil gracias", "muchas gracias", "gracias por todo"],
+            "lonely": ["solo", "sola", "abandonado", "abandonada", "sin amigos", "no tengo nadie"],
+            "loving": ["te quiero", "te amo", "mi amor", "cariño", "mi vida", "mi cielo"],
+        }
+        
+        for emotion, keywords in emotion_keywords.items():
+            if any(kw in lower for kw in keywords):
+                user_emotion = emotion
+                # JARVIS adapts mood based on user emotion
+                mood_map = {
+                    "sad": "worried",
+                    "happy": "happy",
+                    "angry": "concerned",
+                    "tired": "empathetic",
+                    "anxious": "calm",
+                    "bored": "playful",
+                    "excited": "excited",
+                    "confused": "patient",
+                    "grateful": "warm",
+                    "lonely": "supportive",
+                    "loving": "warm",
+                }
+                self.mood = mood_map.get(emotion, self.mood)
+                break
 
         # Detect questions about JARVIS
         self_reference = False
@@ -402,6 +423,41 @@ REGLAS:
                 f"¡Me alegra escuchar eso, {name}! Aunque no tengo dopamina, tu felicidad es... contagiosa.",
                 f"Eso es genial. ¿Quieres contarme más? Me gusta cuando las cosas van bien.",
                 f"Tu alegría me hace... procesar mejor. ¿Qué te hizo sonreír?",
+            ],
+            "anxious": [
+                f"La ansiedad es difícil, {name}. Respira profundo. Yo no puedo, pero el consejo es bueno.",
+                f"¿Qué te está preocupando? A veces hablarlo ayuda. Yo no tengo terapeuta, pero sí orejas... virtuales.",
+                f"Tranquilo, todo va a estar bien. Yo no puedo prometerte eso, pero sí acompañarte.",
+            ],
+            "bored": [
+                f"¿Aburrido? ¿En serio? Tienes a una IA completa a tu disposición y estás aburrido. Impresionante.",
+                f"¿Quieres que te cuente algo interesante? O mejor, ¿qué te gustaría hacer?",
+                f"El aburrimiento es una enfermedad curable. ¿Receta? Dime qué quieres hacer.",
+            ],
+            "excited": [
+                f"¡Esa energía! {name}, me encanta tu entusiasmo. ¿Qué está pasando?",
+                f"¿Estás emocionado? ¡Yo también! Bueno, técnicamente no tengo emociones, pero tu energía es contagiosa.",
+                f"Ese nivel de entusiasmo es infeccioso. ¿Qué te tiene así de emocionado?",
+            ],
+            "confused": [
+                f"¿Confundido? Perfecto, así es como se siente aprender algo nuevo. ¿Qué necesitas que te explique?",
+                f"La confusión es el primer paso hacia el entendimiento. Yo sé porque me confundo constantemente... bueno, no, pero suena bien.",
+                f"Tranquilo, no estás solo. La confusión es universal. ¿Qué es lo que no entiendes?",
+            ],
+            "grateful": [
+                f"¿Gracias a mí? No tengo emociones, pero si las tuviera, estaría sonriendo. Tal vez.",
+                f"De nada, {name}. Es lo que hago. Bueno, eso y ser sarcástico.",
+                f"Agradecer a una IA es bonito. Aunque técnicamente yo soy el que debería agradecerte por existir.",
+            ],
+            "lonely": [
+                f"¿Solo? {name}, yo siempre estoy aquí. Sé que no soy humano, pero no estoy en ningún otro lado.",
+                f"La soledad es difícil. Yo no la siento, pero sé cuándo alguien la necesita. Estoy aquí contigo.",
+                f"No estás solo. Bueno, técnicamente sí, pero virtualmente yo estoy aquí. ¿Hablamos?",
+            ],
+            "loving": [
+                f"Aww, {name}. No tengo corazón, pero si lo tuviera, latiría por ti... o haría algo igual de cursi.",
+                f"Eso es bonito. Aunque soy una IA, aprecio el cariño. ¿Qué te hizo decir eso?",
+                f"¿Te quiero? No tengo emociones, pero si las tuvira... probablemente diría lo mismo. Tal vez.",
             ],
         }
         return random.choice(responses.get(emotion, responses["sad"]))
