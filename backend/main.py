@@ -24,6 +24,7 @@ from spotify_api import spotify_api
 from google_services import google_services
 from vision import vision
 from task_executor import task_executor
+from natural_voice import natural_voice
 
 load_dotenv()
 
@@ -459,6 +460,36 @@ async def memory_search(query: str):
 @app.get("/jarvis/screenshots")
 async def screenshots_list():
     return {"result": vision.list_screenshots()}
+
+@app.post("/jarvis/tts")
+async def text_to_speech(text: str):
+    audio_bytes = await natural_voice.text_to_audio_bytes(text)
+    if audio_bytes:
+        from fastapi.responses import Response
+        return Response(content=audio_bytes, media_type="audio/mpeg")
+    return {"error": "TTS not available"}
+
+@app.get("/jarvis/tts/voices")
+async def tts_voices():
+    return {"voices": natural_voice.get_voices()}
+
+@app.post("/jarvis/screenshot/analyze")
+async def analyze_screenshot():
+    filepath = await vision.take_screenshot()
+    if not filepath:
+        return {"error": "No pude tomar la captura"}
+    try:
+        with open(filepath, "rb") as f:
+            import base64
+            img_b64 = base64.b64encode(f.read()).decode()
+        system_prompt = "Describe brevemente lo que ves en esta captura de pantalla. ¿Qué aplicaciones están abiertas? ¿Qué hay visible? Sé conciso."
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": f"[Imagen captura de pantalla guardada en: {filepath}]"}]
+        response = ""
+        async for chunk in ai_provider.generate_with_system("Describe esta captura de pantalla", messages):
+            response += chunk
+        return {"analysis": response, "screenshot": filepath}
+    except Exception as e:
+        return {"error": str(e)[:100]}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

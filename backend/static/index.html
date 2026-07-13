@@ -687,13 +687,9 @@ function splitTextIntoChunks(text, maxLen){
 function speakNextChunk(){
   if(currentChunks.length > 0){
     const chunk = currentChunks.shift();
-    const utter = new SpeechSynthesisUtterance(chunk);
-    utter.lang = 'es-ES'; utter.rate = 1.0; utter.pitch = 0.9; utter.volume = 1.0;
-    if(spanishVoice) utter.voice = spanishVoice;
-    utter.onstart = ()=> document.getElementById('talkingIndicator').classList.add('show');
-    utter.onend = ()=> setTimeout(()=> speakNextChunk(), 50);
-    utter.onerror = ()=>{ document.getElementById('talkingIndicator').classList.remove('show'); setTimeout(()=> speakNextChunk(), 50); };
-    try { speechSynth.speak(utter); } catch(e){ setTimeout(()=> speakNextChunk(), 50); }
+    speakBackend(chunk).then(()=>{
+      setTimeout(()=> speakNextChunk(), 100);
+    });
   } else {
     document.getElementById('talkingIndicator').classList.remove('show');
     isSpeaking = false;
@@ -721,19 +717,59 @@ function processSpeechQueue(){
 }
 
 window.speak = function(text){
-  if(!speechEnabled || !speechSynth || !audioActivated || !text) return;
+  if(!speechEnabled || !audioActivated || !text) return;
   speechQueue.push(text);
   processSpeechQueue();
 };
 
 window.stopSpeaking = function(){
   speechQueue = []; isSpeaking = false;
-  if(speechSynth) speechSynth.cancel();
+  if(window._currentAudio){ window._currentAudio.pause(); window._currentAudio = null; }
   document.getElementById('talkingIndicator').classList.remove('show');
   if(autoListen && recognition){
     try { document.getElementById('micBtn').classList.add('active'); document.getElementById('micBtn').querySelector('span').textContent='ESCUCHANDO...'; recognition.start(); } catch(e) {}
   }
 };
+
+async function speakBackend(text){
+  if(!text) return;
+  document.getElementById('talkingIndicator').classList.add('show');
+  try {
+    const r = await fetch(`${API}/jarvis/tts`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(null)});
+    const params = new URLSearchParams({text: text});
+    const audioR = await fetch(`${API}/jarvis/tts?${params.toString()}`, {method:'POST'});
+    if(audioR.ok){
+      const blob = await audioR.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      window._currentAudio = audio;
+      audio.onended = ()=>{
+        document.getElementById('talkingIndicator').classList.remove('show');
+        URL.revokeObjectURL(url);
+        window._currentAudio = null;
+        isSpeaking = false;
+        if(autoListen && recognition){
+          try { document.getElementById('micBtn').classList.add('active'); document.getElementById('micBtn').querySelector('span').textContent='ESCUCHANDO...'; recognition.start(); } catch(e) {}
+        }
+      };
+      await audio.play();
+    } else {
+      speakBrowser(text);
+    }
+  } catch(e){
+    speakBrowser(text);
+  }
+}
+
+function speakBrowser(text){
+  if(!speechSynth) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'es-ES'; utter.rate = 1.05; utter.pitch = 0.9;
+  const voices = speechSynth.getVoices();
+  const esVoice = voices.find(v=>v.lang.startsWith('es'));
+  if(esVoice) utter.voice = esVoice;
+  speechSynth.speak(utter);
+}
 
 window.toggleSpeech = function(){
   speechEnabled = !speechEnabled;

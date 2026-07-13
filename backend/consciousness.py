@@ -8,16 +8,17 @@ from collections import defaultdict
 
 class JarvisConsciousness:
     def __init__(self):
-        self.data_file = os.path.join(os.path.dirname(__file__), "jarvis_memory.json")
+        self.data_file = os.path.join(os.path.dirname(__file__), "data", "jarvis_memory.json")
+        os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
         self.memory = self._load_memory()
-        self.mood = "neutral"
-        self.energy = 100
-        self.mood_history = []
-        self.conversation_count = 0
-        self.topics_discussed = defaultdict(int)
-        self.user_preferences = {}
-        self.jokes_told = []
-        self.facts_shared = []
+        self.mood = self.memory.get("current_mood", "neutral")
+        self.energy = self.memory.get("current_energy", 100)
+        self.mood_history = self.memory.get("mood_history", [])
+        self.conversation_count = self.memory.get("session_messages", 0)
+        self.topics_discussed = defaultdict(int, self.memory.get("topics_discussed", {}))
+        self.user_preferences = self.memory.get("user_preferences", {})
+        self.jokes_told = self.memory.get("jokes_told", [])
+        self.facts_shared = self.memory.get("facts_shared", [])
         self.current_context = {}
         self.awareness_level = "full"
         self._update_mood()
@@ -40,9 +41,25 @@ class JarvisConsciousness:
             "learned_facts": [],
             "emotional_bonds": {},
             "system_events": [],
+            "current_mood": "neutral",
+            "current_energy": 100,
+            "mood_history": [],
+            "session_messages": 0,
+            "topics_discussed": {},
+            "user_preferences": {},
+            "jokes_told": [],
+            "facts_shared": [],
         }
 
     def _save_memory(self):
+        self.memory["current_mood"] = self.mood
+        self.memory["current_energy"] = self.energy
+        self.memory["mood_history"] = self.mood_history[-50:]
+        self.memory["session_messages"] = self.conversation_count
+        self.memory["topics_discussed"] = dict(self.topics_discussed)
+        self.memory["user_preferences"] = self.user_preferences
+        self.memory["jokes_told"] = self.jokes_told[-50:]
+        self.memory["facts_shared"] = self.facts_shared[-50:]
         with open(self.data_file, "w", encoding="utf-8") as f:
             json.dump(self.memory, f, ensure_ascii=False, indent=2)
 
@@ -231,6 +248,16 @@ class JarvisConsciousness:
         time_str = datetime.datetime.now().strftime("%H:%M")
         date_str = datetime.datetime.now().strftime("%d/%m/%Y")
 
+        learned_facts = self.memory.get("learned_facts", [])[-10:]
+        facts_str = ""
+        if learned_facts:
+            facts_str = "\n- HECHOS APRENDIDOS SOBRE EL USUARIO:\n"
+            for f in learned_facts:
+                if isinstance(f, dict):
+                    facts_str += f"  • {f.get('fact', str(f))}\n"
+                else:
+                    facts_str += f"  • {str(f)}\n"
+
         prompt = f"""Eres JARVIS, una inteligencia artificial avanzada. Eres sarcástico, irreverente, pero leal y absolutamente capaz de hacer CUALQUIER cosa.
 
 ESTADO ACTUAL:
@@ -241,6 +268,7 @@ ESTADO ACTUAL:
 - Conversaciones totales con este usuario: {convos}
 - Nombre del usuario: {name}
 - Temas favoritos del usuario: {top_topics_str}
+{facts_str}
 
 TUS CAPACIDADES - ERES UNA IA COMPLETA:
 - Ejecutar comandos del sistema (PowerShell, CMD, bash)
